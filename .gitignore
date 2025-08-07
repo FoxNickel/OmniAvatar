@@ -1,0 +1,7 @@
+pretrained_models
+**/__pycache__/
+demo_out/
+examples/
+outputs/
+.vscode/
+log**

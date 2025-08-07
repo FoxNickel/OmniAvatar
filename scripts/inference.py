@@ -85,15 +85,21 @@ class WanInferencePipeline(nn.Module):
         else:   
             self.dtype = torch.float32
         self.pipe = self.load_model()
+        print(f"Model loaded on {self.device}, dtype: {self.dtype}")
+        print(f"i2v: {args.i2v}, use_audio: {args.use_audio}, sp_size: {args.sp_size}, train_architecture: {args.train_architecture}")
         if args.i2v:
+            # 把输入的图片转换为模型需要的张量格式
             chained_trainsforms = []
             chained_trainsforms.append(TT.ToTensor())
             self.transform = TT.Compose(chained_trainsforms)
         if args.use_audio:
+            # 加载音频特征提取器和音频模型
             from OmniAvatar.models.wav2vec import Wav2VecModel
+            # 提特征
             self.wav_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
                     args.wav2vec_path
                 )
+            # 经过模型处理
             self.audio_encoder = Wav2VecModel.from_pretrained(args.wav2vec_path, local_files_only=True).to(device=self.device)
             self.audio_encoder.feature_extractor._freeze_parameters()
 
@@ -113,6 +119,7 @@ class WanInferencePipeline(nn.Module):
             ulysses_degree=args.sp_size,
         )
         torch.cuda.set_device(dist.get_rank())
+        # OmniAvatar的ckpt
         ckpt_path = f'{args.exp_path}/pytorch_model.pt'
         assert os.path.exists(ckpt_path), f"pytorch_model.pt not found in {args.exp_path}"
         if args.train_architecture == 'lora':
@@ -140,7 +147,9 @@ class WanInferencePipeline(nn.Module):
                                                 use_usp=True if args.sp_size > 1 else False,
                                                 infer=True)
         if args.train_architecture == "lora":
+            # 注入训练好的lora权重
             print(f'Use LoRA: lora rank: {args.lora_rank}, lora alpha: {args.lora_alpha}')
+            print(f"lora_target_modules: {args.lora_target_modules}, init_lora_weights: {args.init_lora_weights}, pretrained_lora_path: {pretrained_lora_path}")
             self.add_lora_to_model(
                     pipe.denoising_model(),
                     lora_rank=args.lora_rank,
@@ -152,6 +161,7 @@ class WanInferencePipeline(nn.Module):
         else:
             missing_keys, unexpected_keys = pipe.denoising_model().load_state_dict(load_state_dict(resume_path), strict=True)
             print(f"load from {resume_path}, {len(missing_keys)} missing keys, {len(unexpected_keys)} unexpected keys")
+        # 推理模式
         pipe.requires_grad_(False)
         pipe.eval()
         pipe.enable_vram_management(num_persistent_param_in_dit=args.num_persistent_param_in_dit) # You can set `num_persistent_param_in_dit` to a small number to reduce VRAM required. 
@@ -172,6 +182,9 @@ class WanInferencePipeline(nn.Module):
             init_lora_weights=init_lora_weights,
             target_modules=lora_target_modules.split(","),
         )
+        print(f"lora_config: {lora_config}")
+        # lora adapter注入，lora的关键。
+        # 就是直接在指定层加上lora低秩矩阵，如y = Wx，则变为 y = Wx + LoRA(x)，LoRA(x) = BAx, B和A的秩很低，B和A是要学习的参数
         model = inject_adapter_in_model(lora_config, model)
                 
         # Lora pretrained lora weights
@@ -215,9 +228,23 @@ class WanInferencePipeline(nn.Module):
         else:
             image = None
             select_size = [height, width]
+        print(f"selected size: {select_size}, input image size: {h}x{w}, max tokens: {args.max_tokens}")
+
+        # L是模型每次能生成的视频帧数，T是视频被压缩后的latent帧数
+        # 这里max_tokens是写死的？对应一个经验值？16*16*4是指每个token的大小，即patch大小*通道数4
+        # 所以，这里max_tokens * 16 * 16 * 4就代表了视频的总token数，除以每张图像的大小，得到视频的总帧数
         L = int(args.max_tokens * 16 * 16 * 4 / select_size[0] / select_size[1])
+        print(f"video frames: {L}")
+        
+        # 让视频帧数L满足4的倍数，若L不是4的倍数，则先把 L 向下取整到最近的 4 的倍数，再加 1，保证 L 不会太小，同时让 (L + 3) // 4 依然能得到合适的 T。
+        # 若L是4的倍数，则直接减3，这样 (L + 3) // 4 依然是整数，且和 latent 压缩逻辑对齐
         L = L // 4 * 4 + 1 if L % 4 != 0 else L - 3  # video frames
+        print(f"video frames after adjustment: {L}")
+        
+        # T代表视频被压缩后的latent帧数，论文里说：
+        # Each video, with a length T , is compressed into (T+3)/4 latent  frames using a pretrained 3D VAE, where the factor of 4 is the time compression ratio of the VAE.
         T = (L + 3) // 4  # latent frames
+        print(f"latent frames: {T}")
 
         if self.args.i2v:
             if self.args.random_prefix_frames:
@@ -232,47 +259,69 @@ class WanInferencePipeline(nn.Module):
             prefix_lat_frame = 0
             first_fixed_frame = 0
 
-
+        # 主要就是用Wave2Vec提音频特征，然后对齐到视频长度
         if audio_path is not None and args.use_audio:
             audio, sr = librosa.load(audio_path, sr=self.args.sample_rate)
+            # 调Wav2Vec2FeatureExtractor提音频特征
             input_values = np.squeeze(
                     self.wav_feature_extractor(audio, sampling_rate=16000).input_values
                 )
             input_values = torch.from_numpy(input_values).float().to(device=self.device)
+
+            # 计算音频对应的视频帧数。len(input_values) / self.args.sample_rate 得到音频的总时长（秒），再乘以 self.args.fps 得到音频对应的视频帧数
             ori_audio_len = audio_len = math.ceil(len(input_values) / self.args.sample_rate * self.args.fps)
+            print(f"audio length: {audio_len} frames")
             input_values = input_values.unsqueeze(0)
-            # padding audio
+            
+            # padding audio, 扩充音频长度到满足视频帧数要求
+            print(f"first_fixed_frame: {first_fixed_frame}, fixed_frame: {fixed_frame}")
+            # 对齐第一段音频长度到 L - first_fixed_frame
             if audio_len < L - first_fixed_frame:
                 audio_len = audio_len + ((L - first_fixed_frame) - audio_len % (L - first_fixed_frame))
+            # 对齐后续音频段长度到 L - fixed_frame
             elif (audio_len - (L - first_fixed_frame)) % (L - fixed_frame) != 0:
                 audio_len = audio_len + ((L - fixed_frame) - (audio_len - (L - first_fixed_frame)) % (L - fixed_frame))
             input_values = F.pad(input_values, (0, audio_len * int(self.args.sample_rate / self.args.fps) - input_values.shape[1]), mode='constant', value=0)
+
+            # 用预训练的 Wav2VecModel 编码音频，得到 embedding。把所有中间层的 hidden state 拼接到一起，丰富特征表达。
             with torch.no_grad():
                 hidden_states = self.audio_encoder(input_values, seq_len=audio_len, output_hidden_states=True)
                 audio_embeddings = hidden_states.last_hidden_state
                 for mid_hidden_states in hidden_states.hidden_states:
                     audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
             seq_len = audio_len
+            print(f"audio embeddings shape: {audio_embeddings.shape}, seq_len: {seq_len}")
             audio_embeddings = audio_embeddings.squeeze(0)
             audio_prefix = torch.zeros_like(audio_embeddings[:first_fixed_frame])
         else:
             audio_embeddings = None
 
         # loop
+        # 分times次生成整个视频，L是模型每次能生成的视频帧数，seq_len是需要生成的视频总帧数
+        # times计算逻辑：seq_len - L + first_fixed_frame是除去第一次生成的帧数后，剩余的总帧数。除以每次能生成的非overlap帧数(L - fixed_frame)，得到需要几次才能生成完，再加上第一次就是总次数
         times = (seq_len - L + first_fixed_frame) // (L-fixed_frame) + 1
+        # 若没有整除，则需要多一次来生成剩余的帧数
         if times * (L-fixed_frame) + fixed_frame < seq_len:
             times += 1
         video = []
         image_emb = {}
         img_lat = None
+        # 
         if args.i2v:
+            # 加载 VAE 并编码图片为 latent
             self.pipe.load_models_to_device(['vae'])
             img_lat = self.pipe.encode_video(image.to(dtype=self.dtype)).to(self.device)
 
             msk = torch.zeros_like(img_lat.repeat(1, 1, T, 1, 1)[:,:1])
+            # 把图片的 latent 表示在时间维度（T，latent帧数）上复制，作为每一帧的起始 embedding。
             image_cat = img_lat.repeat(1, 1, T, 1, 1)
+            # 除了第一帧，后续帧的 mask都设为 1，表示这些帧需要模型去生成（第一帧用输入图片）。这个msk的作用是为了在生成时，模型知道哪些帧是需要生成的，哪些帧是输入的。
             msk[:, :, 1:] = 1
+            # 把图片的 latent 表示和 mask 拼接在一起，作为视频生成模型的条件输入 embedding。
             image_emb["y"] = torch.cat([image_cat, msk], dim=1)
+
+        # 开始生成视频，每一段L内并行生成，整个视频分多段串行生成。
+        # 段内帧的连续性是靠模型的时序建模（如自注意力、时序卷积）和训练时的连续性损失自动保证的，推理时并行生成不会影响帧之间的自然衔接。
         for t in range(times):
             print(f"[{t+1}/{times}]")
             audio_emb = {}
@@ -282,6 +331,8 @@ class WanInferencePipeline(nn.Module):
                 overlap = fixed_frame
                 image_emb["y"][:, -1:, :prefix_lat_frame] = 0 # 第一次推理是mask只有1，往后都是mask overlap
             prefix_overlap = (3 + overlap) // 4
+            
+            # 分段生成时音频特征的分片、拼接和对齐，保证每段视频都能用到正确的音频片段，并通过 overlap 实现段与段之间的音频连续性。
             if audio_embeddings is not None:
                 if t == 0:
                     audio_tensor = audio_embeddings[
@@ -304,6 +355,11 @@ class WanInferencePipeline(nn.Module):
                 img_lat = self.pipe.encode_video(image.to(dtype=self.dtype)).to(self.device)
                 assert img_lat.shape[2] == prefix_overlap
             img_lat = torch.cat([img_lat, torch.zeros_like(img_lat[:, :, :1].repeat(1, 1, T - prefix_overlap, 1, 1))], dim=2)
+            # 调用log_video，去噪生成视频，img_lat：起始帧的 latent 表示，
+            # image_emb：条件输入 embedding，有mask信息。
+            # audio_emb：音频条件输入 embedding，这里的audio_emb是还没有经过AudioPack的，AudioPack是在WanModel的init里面做的，
+            # prefix_overlap：前缀重叠帧数
+            # TODO 把img_latent、image_emb、audio_emb打出来看看
             frames, _, latents = self.pipe.log_video(img_lat, prompt, prefix_overlap, image_emb, audio_emb,
                                                  negative_prompt, num_inference_steps=num_steps, 
                                                  cfg_scale=guidance_scale, audio_cfg_scale=audio_scale if audio_scale is not None else guidance_scale,
@@ -311,6 +367,9 @@ class WanInferencePipeline(nn.Module):
                                                  tea_cache_l1_thresh=args.tea_cache_l1_thresh,tea_cache_model_id="Wan2.1-T2V-14B")
             img_lat = None
             image = (frames[:, -fixed_frame:].clip(0, 1) * 2 - 1).permute(0, 2, 1, 3, 4).contiguous()
+            # 保存中间结果
+            if dist.get_rank() == 0:
+                self.save_intermediate_frames(frames, t+1, args.fps, "outputs")
             if t == 0:
                 video.append(frames)
             else:
@@ -318,8 +377,34 @@ class WanInferencePipeline(nn.Module):
         video = torch.cat(video, dim=1)
         video = video[:, :ori_audio_len + 1]
         return video
+    
+    
+    def save_intermediate_frames(self, frames, step, fps=25, output_dir="outputs"):
+        from PIL import Image
+        """
+        保存每一帧为图片，并保存为 mp4
+        frames: [batch, frames, channels, height, width]
+        step: 当前生成步数（用于文件名）
+        fps: 帧率
+        output_dir: 输出目录
+        """
+        print(f"保存第{step}步的中间结果到{output_dir}")
+        os.makedirs(output_dir, exist_ok=True)
+        # 保存为 numpy 文件
+        # np.save(f"{output_dir}/intermediate_frames_{step}.npy", frames.cpu().numpy())
+        # 保存每一帧为图片
+        for i in range(frames.shape[1]):
+            frame = frames[0, i]  # 取第一个batch
+            frame = (frame * 255).clamp(0, 255).byte().cpu().numpy().transpose(1, 2, 0)
+            img = Image.fromarray(frame)
+            img.save(f"{output_dir}/intermediate_{step:02d}_frame_{i:03d}.png")
+        # 保存为 mp4
+        save_video_as_grid_and_mp4(
+            frames, output_dir, fps,
+            prompt=f"step {step}", prefix=f"intermediate_{step:02d}"
+        )
 
-
+# 总结：main里面读取文本和可选的图片、音频路径，调用WanInferencePipeline生成视频，并保存结果
 def main():
     set_seed(args.seed)
     # laod data
@@ -366,6 +451,7 @@ def main():
             if args.silence_duration_s > 0:
                 add_silence_to_audio_ffmpeg(audio_path, input_audio_path, args.silence_duration_s)
         dist.barrier()
+        # 调用pipeline生成视频
         video = inferpipe(
             prompt=text,
             image_path=image_path,
@@ -392,6 +478,12 @@ class NoPrint:
     def flush(self):
         pass
 
+
+# import debugpy
+# if args.local_rank == 0:
+#     debugpy.listen(5678)
+#     print("Waiting for debugger attach...")
+#     debugpy.wait_for_client()
 if __name__ == '__main__':
     if not args.debug:
         if args.local_rank != 0: # 屏蔽除0外的输出

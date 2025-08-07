@@ -129,8 +129,10 @@ class WanVideoPipeline(BasePipeline):
             self.text_encoder, tokenizer_path = text_encoder_model_and_path
             self.prompter.fetch_models(self.text_encoder)
             self.prompter.fetch_tokenizer(os.path.join(os.path.dirname(tokenizer_path), "google/umt5-xxl"))
+        # omni的核心模型，在model_config.py中配置
         self.dit = model_manager.fetch_model("wan_video_dit")
         self.vae = model_manager.fetch_model("wan_video_vae")
+        # TODO 这个image_encoder要看下怎么来的，好像没传这个encoder
         self.image_encoder = model_manager.fetch_model("wan_video_image_encoder")
 
 
@@ -139,6 +141,7 @@ class WanVideoPipeline(BasePipeline):
         if device is None: device = model_manager.device
         if torch_dtype is None: torch_dtype = model_manager.torch_dtype
         pipe = WanVideoPipeline(device=device, torch_dtype=torch_dtype)
+        # 加载Omni的模型
         pipe.fetch_models(model_manager)
         if use_usp:
             from xfuser.core.distributed import get_sequence_parallel_world_size, get_sp_group
@@ -235,6 +238,7 @@ class WanVideoPipeline(BasePipeline):
         # Encode prompts
         self.load_models_to_device(["text_encoder"])
         prompt_emb_posi = self.encode_prompt(prompt, positive=True)
+        # cfg_scale 控制生成内容对条件（如文本、音频等）的依赖强度
         if cfg_scale != 1.0:
             prompt_emb_nega = self.encode_prompt(negative_prompt, positive=False)
 
@@ -253,18 +257,22 @@ class WanVideoPipeline(BasePipeline):
         # Denoise
         self.load_models_to_device(["dit"])
         for progress_id, timestep in enumerate(progress_bar_cmd(self.scheduler.timesteps, disable=self.sp_size > 1 and torch.distributed.get_rank() != 0)):
-            if fixed_frame > 0: # new
+            if fixed_frame > 0: # nw
                 latents[:, :, :fixed_frame] = lat[:, :, :fixed_frame]
             timestep = timestep.unsqueeze(0).to(dtype=self.torch_dtype, device=self.device)
 
-            # Inference
+            # Inference, 降噪过程，主要就是用dit去预测噪声
+            # noise_pred_posi预测的是添加了正向prompt和音频条件下的噪声
+            # latents是首帧，image_emb是ref，audio_emb是音频
             noise_pred_posi = self.dit(latents, timestep=timestep, **prompt_emb_posi, **image_emb, **audio_emb, **tea_cache_posi, **extra_input)
             if cfg_scale != 1.0:
                 audio_emb_uc = {}
                 for key in audio_emb.keys():
                     audio_emb_uc[key] = torch.zeros_like(audio_emb[key])
                 if audio_cfg_scale == cfg_scale:
+                    # noise_pred_nega预测的是添加了负向prompt和音频条件下的噪声
                     noise_pred_nega = self.dit(latents, timestep=timestep, **prompt_emb_nega, **image_emb, **audio_emb_uc, **tea_cache_nega, **extra_input)
+                    # noise_pred是最终的噪声预测结果
                     noise_pred = noise_pred_nega + cfg_scale * (noise_pred_posi - noise_pred_nega)
                 else:
                     tea_cache_nega_audio = {"tea_cache": TeaCache(num_inference_steps, rel_l1_thresh=tea_cache_l1_thresh, model_id=tea_cache_model_id) if tea_cache_l1_thresh is not None and tea_cache_l1_thresh > 0 else None}
@@ -273,7 +281,7 @@ class WanVideoPipeline(BasePipeline):
                     noise_pred = text_noise_pred_nega + cfg_scale * (audio_noise_pred_nega - text_noise_pred_nega) + audio_cfg_scale * (noise_pred_posi - audio_noise_pred_nega)
             else:
                 noise_pred = noise_pred_posi
-            # Scheduler
+            # Scheduler，在随机噪声上降噪
             latents = self.scheduler.step(noise_pred, self.scheduler.timesteps[progress_id], latents)
             
         if fixed_frame > 0: # new

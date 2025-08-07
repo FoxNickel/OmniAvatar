@@ -195,6 +195,7 @@ class GateModule(nn.Module):
     def forward(self, x, gate, residual):
         return x + gate * residual
 
+# DiTBlock 是 WanModel 的核心构建单元，结合自注意力、跨模态注意力、MLP、归一化和时序调制，实现时空建模和多模态条件融合，是视频生成 Transformer 的关键模块。
 class DiTBlock(nn.Module):
     def __init__(self, has_image_input: bool, dim: int, num_heads: int, ffn_dim: int, eps: float = 1e-6):
         super().__init__()
@@ -202,24 +203,33 @@ class DiTBlock(nn.Module):
         self.num_heads = num_heads
         self.ffn_dim = ffn_dim
 
+        # 多头自注意力层
         self.self_attn = SelfAttention(dim, num_heads, eps)
-        self.cross_attn = CrossAttention(
-            dim, num_heads, eps, has_image_input=has_image_input)
+        # 多头跨模态注意力层（支持图片条件）
+        self.cross_attn = CrossAttention(dim, num_heads, eps, has_image_input=has_image_input)
+        # 三个LayerNorm归一化层
         self.norm1 = nn.LayerNorm(dim, eps=eps, elementwise_affine=False)
         self.norm2 = nn.LayerNorm(dim, eps=eps, elementwise_affine=False)
         self.norm3 = nn.LayerNorm(dim, eps=eps)
+        # 前馈网络（MLP）
         self.ffn = nn.Sequential(nn.Linear(dim, ffn_dim), nn.GELU(
             approximate='tanh'), nn.Linear(ffn_dim, dim))
         self.modulation = nn.Parameter(torch.randn(1, 6, dim) / dim**0.5)
+        # 残差门控模块
         self.gate = GateModule()
 
     def forward(self, x, context, t_mod, freqs):
         # msa: multi-head self-attention  mlp: multi-layer perceptron
+        # t_mod: 当前时间步的调制参数，和modulation参数相加后分成6份
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (
             self.modulation.to(dtype=t_mod.dtype, device=t_mod.device) + t_mod).chunk(6, dim=1)
         input_x = modulate(self.norm1(x), shift_msa, scale_msa)
         x = self.gate(x, gate_msa, self.self_attn(input_x, freqs))
+
+        # 2. 跨模态注意力分支（如文本/图片条件）
         x = x + self.cross_attn(self.norm3(x), context)
+
+        # 3. 前馈网络分支
         input_x = modulate(self.norm2(x), shift_mlp, scale_mlp)
         x = self.gate(x, gate_mlp, self.ffn(input_x))
         return x
@@ -259,51 +269,69 @@ class Head(nn.Module):
 class WanModel(torch.nn.Module):
     def __init__(
         self,
-        dim: int,
-        in_dim: int,
-        ffn_dim: int,
-        out_dim: int,
-        text_dim: int,
-        freq_dim: int,
-        eps: float,
-        patch_size: Tuple[int, int, int],
-        num_heads: int,
-        num_layers: int,
-        has_image_input: bool,
-        audio_hidden_size: int=32,
+        dim: int,                # 主干特征维度（Transformer内部通道数），决定模型容量和表达能力
+        in_dim: int,             # 输入特征维度（如视频latent的通道数），用于patch embedding的输入
+        ffn_dim: int,            # 前馈网络（MLP）隐藏层维度，影响每个block的非线性建模能力
+        out_dim: int,            # 输出特征维度（如视频latent的通道数），用于还原输出patch
+        text_dim: int,           # 文本embedding的输入维度（如CLIP/TextEncoder输出的维度）
+        freq_dim: int,           # 时间步嵌入的输入维度，用于扩散时间步的编码
+        eps: float,              # LayerNorm/RMSNorm等归一化的数值稳定参数
+        patch_size: Tuple[int, int, int], # patch的三维尺寸（帧数, 高度, 宽度），用于视频分块
+        num_heads: int,          # Transformer自注意力的头数，影响时空建模能力
+        num_layers: int,         # Transformer block的层数，决定模型深度
+        has_image_input: bool,   # 是否支持图片条件输入（如i2v任务），决定是否启用图片相关模块
+        audio_hidden_size: int=32, # 音频条件隐藏层维度，影响音频特征的表达能力
     ):
         super().__init__()
+        # Using WanModel with dim=1536, in_dim=33, ffn_dim=8960, out_dim=16, text_dim=4096, freq_dim=256, eps=1e-06, patch_size=[1, 2, 2], num_heads=12, num_layers=30, has_image_input=False, audio_hidden_size=32
+        print(f"Using WanModel with dim={dim}, in_dim={in_dim}, ffn_dim={ffn_dim}, out_dim={out_dim}, text_dim={text_dim}, freq_dim={freq_dim}, eps={eps}, patch_size={patch_size}, num_heads={num_heads}, num_layers={num_layers}, has_image_input={has_image_input}, audio_hidden_size={audio_hidden_size}")
+
+        # 保存主要参数为成员变量
         self.dim = dim
         self.freq_dim = freq_dim
         self.has_image_input = has_image_input
         self.patch_size = patch_size
 
+        # Patch Embedding：用3D卷积将输入视频分块并升维到dim
         self.patch_embedding = nn.Conv3d(
             in_dim, dim, kernel_size=patch_size, stride=patch_size)
-            # nn.LayerNorm(dim)
+            # nn.LayerNorm(dim) # 可选归一化
+
+        # 文本嵌入层：将文本embedding投影到主干维度
         self.text_embedding = nn.Sequential(
             nn.Linear(text_dim, dim),
             nn.GELU(approximate='tanh'),
             nn.Linear(dim, dim)
         )
+
+        # 时间步嵌入层：将扩散时间步编码为向量
         self.time_embedding = nn.Sequential(
             nn.Linear(freq_dim, dim),
             nn.SiLU(),
             nn.Linear(dim, dim)
         )
+        # 时间步调制层：进一步投影为6倍维度，用于调制block内部行为
         self.time_projection = nn.Sequential(
             nn.SiLU(), nn.Linear(dim, dim * 6))
+
+        # Transformer Blocks：堆叠多个DiTBlock，每个block负责时空/条件建模
         self.blocks = nn.ModuleList([
             DiTBlock(has_image_input, dim, num_heads, ffn_dim, eps)
             for _ in range(num_layers)
         ])
+
+        # 输出头部：将主干特征还原为输出patch
         self.head = Head(dim, out_dim, patch_size, eps)
+
+        # RoPE位置编码：预计算3D旋转位置编码频率，用于时空自注意力
         head_dim = dim // num_heads
         self.freqs = precompute_freqs_cis_3d(head_dim)
 
+        # 图片输入支持：如果启用，定义MLP将CLIP图像特征投影到主干维度
         if has_image_input:
             self.img_emb = MLP(1280, dim)  # clip_feature_dim = 1280
 
+        # 音频输入支持：根据配置决定是否启用音频条件
         if 'use_audio' in args:
             self.use_audio = args.use_audio
         else:
@@ -311,11 +339,32 @@ class WanModel(torch.nn.Module):
         if self.use_audio:
             audio_input_dim = 10752
             audio_out_dim = dim
+            # 音频特征投影模块
             self.audio_proj = AudioPack(audio_input_dim, [4, 1, 1], audio_hidden_size, layernorm=True)
+            # 为部分block准备音频条件投影层
             self.audio_cond_projs = nn.ModuleList()
             for d in range(num_layers // 2 - 1):
                 l = nn.Linear(audio_hidden_size, audio_out_dim)
-                self.audio_cond_projs.append(l)      
+                self.audio_cond_projs.append(l)
+        
+        # 打印各主要模块结构和参数
+        print("\n[WanModel] patch_embedding:", self.patch_embedding)
+        print("[WanModel] text_embedding:", self.text_embedding)
+        print("[WanModel] time_embedding:", self.time_embedding)
+        print("[WanModel] time_projection:", self.time_projection)
+        print("[WanModel] blocks (DiTBlock):")
+        for i, block in enumerate(self.blocks):
+            print(f"  Block {i}: {block}")
+        print("[WanModel] head:", self.head)
+        print("[WanModel] RoPE freqs shape:", [f.shape for f in self.freqs])
+        if hasattr(self, "img_emb"):
+            print("[WanModel] img_emb:", self.img_emb)
+        if hasattr(self, "audio_proj"):
+            print("[WanModel] audio_proj:", self.audio_proj)
+        if hasattr(self, "audio_cond_projs"):
+            print("[WanModel] audio_cond_projs:")
+            for i, proj in enumerate(self.audio_cond_projs):
+                print(f"  Audio Cond Proj {i}: {proj}")
 
     def patchify(self, x: torch.Tensor):
         grid_size = x.shape[2:]
@@ -330,40 +379,49 @@ class WanModel(torch.nn.Module):
         )
 
     def forward(self,
-                x: torch.Tensor,
-                timestep: torch.Tensor,
-                context: torch.Tensor,
-                clip_feature: Optional[torch.Tensor] = None,
-                y: Optional[torch.Tensor] = None,
-                use_gradient_checkpointing: bool = False,
-                audio_emb: Optional[torch.Tensor] = None,
-                use_gradient_checkpointing_offload: bool = False,
-                tea_cache = None,
-                **kwargs,
-                ):
+            x: torch.Tensor,                      # 输入视频latent或特征
+            timestep: torch.Tensor,               # 当前扩散时间步（整数或向量）
+            context: torch.Tensor,                # 文本条件embedding
+            clip_feature: Optional[torch.Tensor] = None, # 可选CLIP图像特征（未用到）
+            y: Optional[torch.Tensor] = None,     # 图片条件embedding（如mask拼接）
+            use_gradient_checkpointing: bool = False,     # 是否使用梯度检查点，节省显存
+            audio_emb: Optional[torch.Tensor] = None,     # 音频条件embedding
+            use_gradient_checkpointing_offload: bool = False, # 是否将checkpoint临时存CPU
+            tea_cache = None,                     # 分布式推理缓存
+            **kwargs,
+            ):
+        # 1. 时间步嵌入与调制参数
         t = self.time_embedding(
             sinusoidal_embedding_1d(self.freq_dim, timestep))
         t_mod = self.time_projection(t).unflatten(1, (6, self.dim))
+        
+        # 2. 文本条件嵌入
         context = self.text_embedding(context)
+        
+        # 3. 获取输入空间尺寸
         lat_h, lat_w = x.shape[-2], x.shape[-1]
 
+        # 4. 音频条件处理（如果启用）
         if audio_emb != None and self.use_audio: # TODO  cache
-            audio_emb = audio_emb.permute(0, 2, 1)[:, :, :, None, None]
-            audio_emb = torch.cat([audio_emb[:, :, :1].repeat(1, 1, 3, 1, 1), audio_emb], 2) # 1, 768, 44, 1, 1
-            audio_emb = self.audio_proj(audio_emb)
+            audio_emb = audio_emb.permute(0, 2, 1)[:, :, :, None, None] # 调整维度
+            audio_emb = torch.cat([audio_emb[:, :, :1].repeat(1, 1, 3, 1, 1), audio_emb], 2) # 1, 768, 44, 1, 1 # 补齐长度
+            audio_emb = self.audio_proj(audio_emb) # 投影到隐藏层
 
-            audio_emb = torch.concat([audio_cond_proj(audio_emb) for audio_cond_proj in self.audio_cond_projs], 0)
+            audio_emb = torch.concat([audio_cond_proj(audio_emb) for audio_cond_proj in self.audio_cond_projs], 0)  # 多层融合
 
-        x = torch.cat([x, y], dim=1)
-        x = self.patch_embedding(x)
-        x, (f, h, w) = self.patchify(x)
-        
+        # 5. 拼接图片条件（如mask），做patch embedding
+        x = torch.cat([x, y], dim=1)  # 拼接图片条件
+        x = self.patch_embedding(x)   # 3D卷积分块升维
+        x, (f, h, w) = self.patchify(x)  # 展平成patch序列
+
+        # 6. 计算RoPE三维位置编码
         freqs = torch.cat([
             self.freqs[0][:f].view(f, 1, 1, -1).expand(f, h, w, -1),
             self.freqs[1][:h].view(1, h, 1, -1).expand(f, h, w, -1),
             self.freqs[2][:w].view(1, 1, w, -1).expand(f, h, w, -1)
-        ], dim=-1).reshape(f * h * w, 1, -1).to(x.device)
-        
+        ], dim=-1).reshape(f * h * w, 1, -1).to(x.device)  # (patch数, 1, 维度)
+
+        # 7. 分布式推理缓存检查
         def create_custom_forward(module):
             def custom_forward(*inputs):
                 return module(*inputs)
@@ -377,6 +435,7 @@ class WanModel(torch.nn.Module):
         if tea_cache_update:
             x = tea_cache.update(x)
         else:
+            # 8. 分布式并行支持（如多卡推理）
             if args.sp_size > 1:
                 # Context Parallel
                 sp_size = get_sequence_parallel_world_size()
@@ -386,10 +445,13 @@ class WanModel(torch.nn.Module):
                     x = torch.cat([x, torch.zeros_like(x[:, -1:]).repeat(1, pad_size, 1)], 1)
                 x = torch.chunk(x, sp_size, dim=1)[get_sequence_parallel_rank()]
 
+            # 9. 音频条件reshape，适配block输入
             audio_emb = audio_emb.reshape(x.shape[0], audio_emb.shape[0] // x.shape[0], -1, *audio_emb.shape[2:])
-                
+            
+            # 10. 主干Transformer block循环
             for layer_i, block in enumerate(self.blocks):
                 # audio cond
+                # 音频条件融合（部分block）
                 if self.use_audio:
                     au_idx = None
                     if (layer_i <= len(self.blocks) // 2 and layer_i > 1): # < len(self.blocks) - 1:
@@ -400,8 +462,9 @@ class WanModel(torch.nn.Module):
                             if pad_size > 0:    
                                 audio_cond_tmp = torch.cat([audio_cond_tmp, torch.zeros_like(audio_cond_tmp[:, -1:]).repeat(1, pad_size, 1)], 1)
                             audio_cond_tmp = torch.chunk(audio_cond_tmp, sp_size, dim=1)[get_sequence_parallel_rank()]
-                        x = audio_cond_tmp + x
+                        x = audio_cond_tmp + x # 音频条件加到主干特征
 
+                # 11. 梯度检查点（节省显存，训练时用）
                 if self.training and use_gradient_checkpointing:
                     if use_gradient_checkpointing_offload:
                         with torch.autograd.graph.save_on_cpu():
@@ -411,6 +474,7 @@ class WanModel(torch.nn.Module):
                                 use_reentrant=False,
                             )
                     else:
+                        # TODO 训练的时候 checkpoint要换，checkpoint的作用是减少显存消耗
                         x = torch.utils.checkpoint.checkpoint(
                             create_custom_forward(block),
                             x, context, t_mod, freqs,
@@ -418,17 +482,20 @@ class WanModel(torch.nn.Module):
                         )
                 else:
                     x = block(x, context, t_mod, freqs)
+            # 12. 分布式缓存同步
             if tea_cache is not None:
                 x_cache = get_sp_group().all_gather(x, dim=1) # TODO: the size should be devided by sp_size
                 x_cache = x_cache[:, :ori_x_len]
                 tea_cache.store(x_cache)
 
+        # 13. 输出头部还原patch
         x = self.head(x, t)
         if args.sp_size > 1:
             # Context Parallel
             x = get_sp_group().all_gather(x, dim=1) # TODO: the size should be devided by sp_size
             x = x[:, :ori_x_len]
 
+        # 14. unpatchify还原为视频帧格式
         x = self.unpatchify(x, (f, h, w))
         return x
 

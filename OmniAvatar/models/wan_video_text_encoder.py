@@ -241,6 +241,15 @@ class WanTextEncoder(torch.nn.Module):
 
         # initialize weights
         self.apply(init_weights)
+        
+        print(f"[WanTextEncoder] token_embedding: {self.token_embedding}")
+        if self.pos_embedding is not None:
+            print(f"[WanTextEncoder] pos_embedding: {self.pos_embedding}")
+        print(f"[WanTextEncoder] dropout: {self.dropout}")
+        print(f"[WanTextEncoder] blocks (T5SelfAttention):")
+        for i, block in enumerate(self.blocks):
+            print(f"  Block {i}: {block}")
+        print(f"[WanTextEncoder] norm: {self.norm}")
 
     def forward(self, ids, mask=None):
         x = self.token_embedding(ids)

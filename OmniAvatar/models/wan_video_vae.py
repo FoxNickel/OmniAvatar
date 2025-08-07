@@ -515,6 +515,11 @@ class VideoVAE_(nn.Module):
         self.conv2 = CausalConv3d(z_dim, z_dim, 1)
         self.decoder = Decoder3d(dim, z_dim, dim_mult, num_res_blocks,
                                  attn_scales, self.temperal_upsample, dropout)
+        
+        print("\n[VideoVAE_] encoder:", self.encoder)
+        print("[VideoVAE_] conv1:", self.conv1)
+        print("[VideoVAE_] conv2:", self.conv2)
+        print("[VideoVAE_] decoder:", self.decoder)
 
     def forward(self, x):
         mu, log_var = self.encode(x)

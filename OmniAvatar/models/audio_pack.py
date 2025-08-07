@@ -10,7 +10,10 @@ def make_triple(value: Union[int, Tuple[int, int, int]]) -> Tuple[int, int, int]
     assert len(value) == 3
     return value
 
-
+# 主要功能：
+# 将输入的高维音频特征（如 [batch, channel, time, height, width]）按照指定 patch 大小分块（patchify）。
+# 将每个 patch 展平成一维后，用全连接层（nn.Linear）投影到指定维度（dim）。
+# 可选地对输出做 LayerNorm 归一化。
 class AudioPack(nn.Module):
     def __init__(
             self,
@@ -27,6 +30,11 @@ class AudioPack(nn.Module):
             self.norm_out = nn.LayerNorm(dim)
         else:
             self.norm_out = None
+        
+        print(f"[AudioPack] patch_size: {self.patch_size}")
+        print(f"[AudioPack] proj: {self.proj}")
+        if self.norm_out is not None:
+            print(f"[AudioPack] norm_out: {self.norm_out}")
 
     def forward(
             self,
