@@ -360,6 +360,7 @@ class WanInferencePipeline(nn.Module):
             # audio_emb：音频条件输入 embedding，这里的audio_emb是还没有经过AudioPack的，AudioPack是在WanModel的init里面做的，
             # prefix_overlap：前缀重叠帧数
             # TODO 把img_latent、image_emb、audio_emb打出来看看
+            print(f"[inference]: img_lat: {img_lat.shape}, prefix_overlap: {prefix_overlap}, audio_emb: {audio_emb['audio_emb'].shape if 'audio_emb' in audio_emb else None}, image_emb y: {image_emb['y'].shape if 'y' in image_emb else None}")
             frames, _, latents = self.pipe.log_video(img_lat, prompt, prefix_overlap, image_emb, audio_emb,
                                                  negative_prompt, num_inference_steps=num_steps, 
                                                  cfg_scale=guidance_scale, audio_cfg_scale=audio_scale if audio_scale is not None else guidance_scale,

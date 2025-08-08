@@ -31,6 +31,7 @@ class AudioPack(nn.Module):
         else:
             self.norm_out = None
         
+        print(f"[AudioPack] in_channels: {in_channels}, t, h, w: {t}, {h}, {w}")
         print(f"[AudioPack] patch_size: {self.patch_size}")
         print(f"[AudioPack] proj: {self.proj}")
         if self.norm_out is not None:
