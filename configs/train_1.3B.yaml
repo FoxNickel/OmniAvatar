@@ -48,4 +48,5 @@ nodes: 1
 devices: 1
 num_train_epochs: 2
 mode: train
-checkpoint_path:
+checkpoint_path: ""
+lr: 1e-4

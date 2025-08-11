@@ -30,7 +30,6 @@ args = parse_args()
 
 
 # 抄DiffSynth的WanTrainingModule写的，Omni训练模块
-# TODO 跟main分开！！！！
 class OmniTrainingModuleOld(DiffusionTrainingModule):
     def __init__(self, args):
         super().__init__()
@@ -47,7 +46,6 @@ class OmniTrainingModuleOld(DiffusionTrainingModule):
         self.pipe = self.load_model()
         print(f"Model loaded on {self.device}, dtype: {self.dtype}")
 
-        # TODO 这里要添加需要冻结的模块
         self.pipe.freeze([])
 
         if args.i2v:
@@ -91,7 +89,6 @@ class OmniTrainingModuleOld(DiffusionTrainingModule):
         )
         torch.cuda.set_device(dist.get_rank())
 
-        # TODO 模型训练的时候怎么初始化？用现有的Omni权重
         ckpt_path = f"{args.exp_path}/pytorch_model.pt"
         assert os.path.exists(
             ckpt_path
