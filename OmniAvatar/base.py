@@ -120,6 +120,23 @@ class BasePipeline(torch.nn.Module):
         # fresh the cuda cache
         torch.cuda.empty_cache()
 
+    def freeze_except(self, trainable_model_names):
+        for name, model in self.named_children():
+            if name in trainable_model_names:
+                model.train()
+                model.requires_grad_(True)
+            else:
+                model.eval()
+                model.requires_grad_(False)
+                
+    def freeze(self, frozen_model_names):
+        for name, model in self.named_children():
+            if name in frozen_model_names:
+                model.eval()
+                model.requires_grad_(False)
+            else:
+                model.train()
+                model.requires_grad_(True)
     
     def generate_noise(self, shape, seed=None, device="cpu", dtype=torch.float16):
         generator = None if seed is None else torch.Generator(device).manual_seed(seed)

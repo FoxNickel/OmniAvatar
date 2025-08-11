@@ -311,14 +311,18 @@ class WanInferencePipeline(nn.Module):
             # 加载 VAE 并编码图片为 latent
             self.pipe.load_models_to_device(['vae'])
             img_lat = self.pipe.encode_video(image.to(dtype=self.dtype)).to(self.device)
+            print(f"img_lat shape: {img_lat.shape}, prefix_lat_frame: {prefix_lat_frame}")
 
             msk = torch.zeros_like(img_lat.repeat(1, 1, T, 1, 1)[:,:1])
+            print(f"msk shape: {msk.shape}")
             # 把图片的 latent 表示在时间维度（T，latent帧数）上复制，作为每一帧的起始 embedding。
             image_cat = img_lat.repeat(1, 1, T, 1, 1)
+            print(f"image_cat shape: {image_cat.shape}")
             # 除了第一帧，后续帧的 mask都设为 1，表示这些帧需要模型去生成（第一帧用输入图片）。这个msk的作用是为了在生成时，模型知道哪些帧是需要生成的，哪些帧是输入的。
             msk[:, :, 1:] = 1
             # 把图片的 latent 表示和 mask 拼接在一起，作为视频生成模型的条件输入 embedding。
             image_emb["y"] = torch.cat([image_cat, msk], dim=1)
+            print(f"image_emb y shape: {image_emb['y'].shape}, prefix_lat_frame: {prefix_lat_frame}")
 
         # 开始生成视频，每一段L内并行生成，整个视频分多段串行生成。
         # 段内帧的连续性是靠模型的时序建模（如自注意力、时序卷积）和训练时的连续性损失自动保证的，推理时并行生成不会影响帧之间的自然衔接。
@@ -359,7 +363,6 @@ class WanInferencePipeline(nn.Module):
             # image_emb：条件输入 embedding，有mask信息。
             # audio_emb：音频条件输入 embedding，这里的audio_emb是还没有经过AudioPack的，AudioPack是在WanModel的init里面做的，
             # prefix_overlap：前缀重叠帧数
-            # TODO 把img_latent、image_emb、audio_emb打出来看看
             print(f"[inference]: img_lat: {img_lat.shape}, prefix_overlap: {prefix_overlap}, audio_emb: {audio_emb['audio_emb'].shape if 'audio_emb' in audio_emb else None}, image_emb y: {image_emb['y'].shape if 'y' in image_emb else None}")
             frames, _, latents = self.pipe.log_video(img_lat, prompt, prefix_overlap, image_emb, audio_emb,
                                                  negative_prompt, num_inference_steps=num_steps, 

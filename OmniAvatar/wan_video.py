@@ -34,7 +34,6 @@ class WanVideoPipeline(BasePipeline):
         self.use_unified_sequence_parallel = False
         self.sp_size = 1
 
-
     def enable_vram_management(self, num_persistent_param_in_dit=None):
         dtype = next(iter(self.text_encoder.parameters())).dtype
         enable_vram_management(
@@ -122,7 +121,6 @@ class WanVideoPipeline(BasePipeline):
             )
         self.enable_cpu_offload()
 
-
     def fetch_models(self, model_manager: ModelManager):
         text_encoder_model_and_path = model_manager.fetch_model("wan_video_text_encoder", require_model_path=True)
         if text_encoder_model_and_path is not None:
@@ -132,9 +130,8 @@ class WanVideoPipeline(BasePipeline):
         # omni的核心模型，在model_config.py中配置
         self.dit = model_manager.fetch_model("wan_video_dit")
         self.vae = model_manager.fetch_model("wan_video_vae")
-        # TODO 这个image_encoder要看下怎么来的，好像没传这个encoder
+        # TODO 这个image_encoder要看下怎么来的，好像没传这个encoder，就是没传，好像没用到
         self.image_encoder = model_manager.fetch_model("wan_video_image_encoder")
-
 
     @staticmethod
     def from_model_manager(model_manager: ModelManager, torch_dtype=None, device=None, use_usp=False, infer=False):
@@ -152,17 +149,14 @@ class WanVideoPipeline(BasePipeline):
             pipe.use_unified_sequence_parallel = True
             pipe.sp_group = get_sp_group()
         return pipe
-    
-    
+
     def denoising_model(self):
         return self.dit
-
 
     def encode_prompt(self, prompt, positive=True):
         prompt_emb = self.prompter.encode_prompt(prompt, positive=positive, device=self.device)
         return {"context": prompt_emb}
-    
-    
+
     def encode_image(self, image, num_frames, height, width):
         image = self.preprocess_image(image.resize((width, height))).to(self.device)
         clip_context = self.image_encoder.encode_image([image])
@@ -171,7 +165,7 @@ class WanVideoPipeline(BasePipeline):
         msk = torch.concat([torch.repeat_interleave(msk[:, 0:1], repeats=4, dim=1), msk[:, 1:]], dim=1)
         msk = msk.view(1, msk.shape[1] // 4, 4, height//8, width//8)
         msk = msk.transpose(1, 2)[0]
-        
+
         vae_input = torch.concat([image.transpose(0, 1), torch.zeros(3, num_frames-1, height, width).to(image.device)], dim=1)
         y = self.vae.encode([vae_input.to(dtype=self.torch_dtype, device=self.device)], device=self.device)[0]
         y = torch.concat([msk, y])
@@ -180,31 +174,65 @@ class WanVideoPipeline(BasePipeline):
         y = y.to(dtype=self.torch_dtype, device=self.device)
         return {"clip_feature": clip_context, "y": y}
 
-
     def tensor2video(self, frames):
         frames = rearrange(frames, "C T H W -> T H W C")
         frames = ((frames.float() + 1) * 127.5).clip(0, 255).cpu().numpy().astype(np.uint8)
         frames = [Image.fromarray(frame) for frame in frames]
         return frames
-    
-    
+
     def prepare_extra_input(self, latents=None):
         return {}
-    
-    
+
     def encode_video(self, input_video, tiled=True, tile_size=(34, 34), tile_stride=(18, 16)):
         latents = self.vae.encode(input_video, device=self.device, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
         return latents
-    
-    
+
     def decode_video(self, latents, tiled=True, tile_size=(34, 34), tile_stride=(18, 16)):
         frames = self.vae.decode(latents, device=self.device, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
         return frames
-    
-    
+
     def prepare_unified_sequence_parallel(self):
         return {"use_unified_sequence_parallel": self.use_unified_sequence_parallel}
 
+    def training_loss(self, **inputs):
+        max_timestep_boundary = int(inputs.get("max_timestep_boundary", 1) * self.scheduler.num_train_timesteps)
+        min_timestep_boundary = int(inputs.get("min_timestep_boundary", 0) * self.scheduler.num_train_timesteps)
+        timestep_id = torch.randint(min_timestep_boundary, max_timestep_boundary, (1,))
+        timestep = self.scheduler.timesteps[timestep_id].to(dtype=self.torch_dtype, device=self.device)
+
+        inputs["latents"] = self.scheduler.add_noise(inputs["input_latents"], inputs["noise"], timestep)
+        training_target = self.scheduler.training_target(inputs["input_latents"], inputs["noise"], timestep)
+
+        # 这里调模型，预测噪声，不需要改，这是通用代码，业务逻辑代理出去了
+        noise_pred = self.model_fn(**inputs, timestep=timestep)
+
+        loss = torch.nn.functional.mse_loss(noise_pred.float(), training_target.float())
+        loss = loss * self.scheduler.training_weight(timestep)
+        return loss
+
+    def model_fn(self, timestep: torch.Tensor = None, **inputs):
+        latents = inputs.get("latents", None)
+        prompt = inputs.get("prompt", "")
+        image_emb = inputs.get("image_emb", {})
+        audio_emb = inputs.get("audio_emb", {})
+
+        # Encode prompts
+        self.load_models_to_device(["text_encoder"])
+        prompt_emb_posi = self.encode_prompt(prompt, positive=True)
+
+        # Extra input
+        extra_input = self.prepare_extra_input(latents)
+
+        # TODO 没有tea cache
+        noise_pred_posi = self.dit(
+            latents,
+            timestep=timestep,
+            **prompt_emb_posi,
+            **image_emb,
+            **audio_emb,
+            **extra_input,
+        )
+        return noise_pred_posi
 
     @torch.no_grad()
     def log_video(
@@ -234,7 +262,7 @@ class WanVideoPipeline(BasePipeline):
 
         latents = lat.clone()
         latents = torch.randn_like(latents)
-        
+
         # Encode prompts
         self.load_models_to_device(["text_encoder"])
         prompt_emb_posi = self.encode_prompt(prompt, positive=True)
@@ -247,11 +275,11 @@ class WanVideoPipeline(BasePipeline):
 
         if self.sp_size > 1:
             latents = self.sp_group.broadcast(latents)
-            
+
         # TeaCache
         tea_cache_posi = {"tea_cache": TeaCache(num_inference_steps, rel_l1_thresh=tea_cache_l1_thresh, model_id=tea_cache_model_id) if tea_cache_l1_thresh is not None and tea_cache_l1_thresh > 0 else None}
         tea_cache_nega = {"tea_cache": TeaCache(num_inference_steps, rel_l1_thresh=tea_cache_l1_thresh, model_id=tea_cache_model_id) if tea_cache_l1_thresh is not None and tea_cache_l1_thresh > 0 else None}
-        
+
         # Unified Sequence Parallel
         usp_kwargs = self.prepare_unified_sequence_parallel()
         # Denoise
@@ -283,7 +311,7 @@ class WanVideoPipeline(BasePipeline):
                 noise_pred = noise_pred_posi
             # Scheduler，在随机噪声上降噪
             latents = self.scheduler.step(noise_pred, self.scheduler.timesteps[progress_id], latents)
-            
+
         if fixed_frame > 0: # new
             latents[:, :, :fixed_frame] = lat[:, :, :fixed_frame]
         # Decode
