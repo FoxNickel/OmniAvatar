@@ -38,5 +38,14 @@ silence_duration_s: 0.3
 use_fsdp: False
 tea_cache_l1_thresh: 0 # 0.14 The larger this value is, the faster the speed, but the worse the visual quality. TODO check value
 
-# 数据集路径
-dataset_base_path: /home/huanglingyu/data/vgg/datasets/Koala-36M-v1
+# 训练参数
+dataset_base_path: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1
+name: train_1.3B
+savedir: /mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs
+batch_size: 4
+# nodes代表分布式训练的节点数，devices代表每个节点上的GPU数量
+nodes: 1
+devices: 1
+num_train_epochs: 2
+mode: train
+checkpoint_path:

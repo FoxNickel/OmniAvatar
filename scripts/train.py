@@ -31,7 +31,7 @@ args = parse_args()
 
 # 抄DiffSynth的WanTrainingModule写的，Omni训练模块
 # TODO 跟main分开！！！！
-class OmniTrainingModule(DiffusionTrainingModule):
+class OmniTrainingModuleOld(DiffusionTrainingModule):
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -476,7 +476,7 @@ class OmniTrainingModule(DiffusionTrainingModule):
 
 if __name__ == "__main__":
     dataset = WanVideoDataset(args=args)
-    model = OmniTrainingModule(args=args)
+    model = OmniTrainingModuleOld(args=args)
     model_logger = ModelLogger(
         args.output_path, remove_prefix_in_ckpt=args.remove_prefix_in_ckpt
     )

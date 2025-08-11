@@ -185,9 +185,28 @@ class VideoDataset(torch.utils.data.Dataset):
 
 # 调用这个dataset之前，要先调用数据集下面的那个generate_metadata的脚本，生成metadata.csv
 class WanVideoDataset(torch.utils.data.Dataset):
-    def __init__(self, dataset_base_path, args=None):
-        if args is not None:
-            dataset_base_path = args.dataset_base_path
+    def __init__(self, args):
+        dataset_base_path = args.dataset_base_path
+        self.dataset_base_path = dataset_base_path
+        metadata_path = os.path.join(dataset_base_path, "metadata.csv")
+        self.metadata_path = metadata_path
+        
+        # 从预处理好的csv或者json里面读出来, 是个数组
+        metadata = pd.read_csv(metadata_path)
+        self.data = [metadata.iloc[i].to_dict() for i in range(len(metadata))]
+        None
+    
+    def __getitem__(self, data_id):
+        data = self.data[data_id % len(self.data)].copy()
+        return data
+    
+    def __len__(self):
+        return len(self.data)
+    
+# TODO validation数据集怎么拆？
+class WanVideoValidationDataset(torch.utils.data.Dataset):
+    def __init__(self, args):
+        dataset_base_path = args.dataset_base_path
         self.dataset_base_path = dataset_base_path
         metadata_path = os.path.join(dataset_base_path, "metadata.csv")
         self.metadata_path = metadata_path
