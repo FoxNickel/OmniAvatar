@@ -219,7 +219,7 @@ class WanInferencePipeline(nn.Module):
         if image_path is not None:
             from PIL import Image
             image = Image.open(image_path).convert("RGB")
-            image = self.transform(image).unsqueeze(0).to(self.device)
+            image = self.transform(image).unsqueeze(0).to(self.device) # 这一步就增加了一个batch维度
             _, _, h, w = image.shape
             select_size = match_size(getattr(self.args, f'image_sizes_{self.args.max_hw}'), h, w)
             image = resize_pad(image, (h, w), select_size)
@@ -271,11 +271,11 @@ class WanInferencePipeline(nn.Module):
             # 计算音频对应的视频帧数。len(input_values) / self.args.sample_rate 得到音频的总时长（秒），再乘以 self.args.fps 得到音频对应的视频帧数
             ori_audio_len = audio_len = math.ceil(len(input_values) / self.args.sample_rate * self.args.fps)
             print(f"audio length: {audio_len} frames")
-            input_values = input_values.unsqueeze(0)
+            input_values = input_values.unsqueeze(0) # 这里又扩展出来batch维度了
             
             # padding audio, 扩充音频长度到满足视频帧数要求
             print(f"first_fixed_frame: {first_fixed_frame}, fixed_frame: {fixed_frame}")
-            # 对齐第一段音频长度到 L - first_fixed_frame
+            # 对齐第一段音频长度到 L - first_fixed_frame，因为这里是overlap了，所以音频长度才不够，需要补
             if audio_len < L - first_fixed_frame:
                 audio_len = audio_len + ((L - first_fixed_frame) - audio_len % (L - first_fixed_frame))
             # 对齐后续音频段长度到 L - fixed_frame
@@ -291,7 +291,7 @@ class WanInferencePipeline(nn.Module):
                     audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
             seq_len = audio_len
             print(f"audio embeddings shape: {audio_embeddings.shape}, seq_len: {seq_len}")
-            audio_embeddings = audio_embeddings.squeeze(0)
+            audio_embeddings = audio_embeddings.squeeze(0) # 这里又把batch维度去掉了
             audio_prefix = torch.zeros_like(audio_embeddings[:first_fixed_frame])
         else:
             audio_embeddings = None
@@ -336,7 +336,7 @@ class WanInferencePipeline(nn.Module):
                 image_emb["y"][:, -1:, :prefix_lat_frame] = 0 # 第一次推理是mask只有1，往后都是mask overlap
             prefix_overlap = (3 + overlap) // 4
             
-            # 分段生成时音频特征的分片、拼接和对齐，保证每段视频都能用到正确的音频片段，并通过 overlap 实现段与段之间的音频连续性。
+            # （也是因为分段overlap生成才需要这个逻辑的）分段生成时音频特征的分片、拼接和对齐，保证每段视频都能用到正确的音频片段，并通过 overlap 实现段与段之间的音频连续性。
             if audio_embeddings is not None:
                 if t == 0:
                     audio_tensor = audio_embeddings[
@@ -350,7 +350,7 @@ class WanInferencePipeline(nn.Module):
                     
                 audio_tensor = torch.cat([audio_prefix, audio_tensor], dim=0)
                 audio_prefix = audio_tensor[-fixed_frame:]
-                audio_tensor = audio_tensor.unsqueeze(0).to(device=self.device, dtype=self.dtype)
+                audio_tensor = audio_tensor.unsqueeze(0).to(device=self.device, dtype=self.dtype) # 增加batch维度
                 audio_emb["audio_emb"] = audio_tensor
             else:
                 audio_prefix = None
@@ -358,7 +358,7 @@ class WanInferencePipeline(nn.Module):
                 self.pipe.load_models_to_device(['vae'])
                 img_lat = self.pipe.encode_video(image.to(dtype=self.dtype)).to(self.device)
                 assert img_lat.shape[2] == prefix_overlap
-            img_lat = torch.cat([img_lat, torch.zeros_like(img_lat[:, :, :1].repeat(1, 1, T - prefix_overlap, 1, 1))], dim=2)
+            img_lat = torch.cat([img_lat, torch.zeros_like(img_lat[:, :, :1].repeat(1, 1, T - prefix_overlap, 1, 1))], dim=2) # 训练的时候不需要
             # 调用log_video，去噪生成视频，img_lat：起始帧的 latent 表示，
             # image_emb：条件输入 embedding，有mask信息。
             # audio_emb：音频条件输入 embedding，这里的audio_emb是还没有经过AudioPack的，AudioPack是在WanModel的init里面做的，

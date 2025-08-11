@@ -183,7 +183,7 @@ class WanVideoPipeline(BasePipeline):
     def prepare_extra_input(self, latents=None):
         return {}
 
-    def encode_video(self, input_video, tiled=True, tile_size=(34, 34), tile_stride=(18, 16)):
+    def encode_video(self, input_video, tiled=True, tile_size=(34, 34), tile_stride=(18, 16)): # input_video[b,c,f,h,w]
         latents = self.vae.encode(input_video, device=self.device, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
         return latents
 
@@ -203,7 +203,6 @@ class WanVideoPipeline(BasePipeline):
         inputs["latents"] = self.scheduler.add_noise(inputs["input_latents"], inputs["noise"], timestep)
         training_target = self.scheduler.training_target(inputs["input_latents"], inputs["noise"], timestep)
 
-        # 这里调模型，预测噪声，不需要改，这是通用代码，业务逻辑代理出去了
         noise_pred = self.model_fn(**inputs, timestep=timestep)
 
         loss = torch.nn.functional.mse_loss(noise_pred.float(), training_target.float())
