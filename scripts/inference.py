@@ -234,17 +234,17 @@ class WanInferencePipeline(nn.Module):
         # 这里max_tokens是写死的？对应一个经验值？16*16*4是指每个token的大小，即patch大小*通道数4
         # 所以，这里max_tokens * 16 * 16 * 4就代表了视频的总token数，除以每张图像的大小，得到视频的总帧数
         L = int(args.max_tokens * 16 * 16 * 4 / select_size[0] / select_size[1])
-        print(f"video frames: {L}")
+        print(f"video frames L: {L}")
         
         # 让视频帧数L满足4的倍数，若L不是4的倍数，则先把 L 向下取整到最近的 4 的倍数，再加 1，保证 L 不会太小，同时让 (L + 3) // 4 依然能得到合适的 T。
         # 若L是4的倍数，则直接减3，这样 (L + 3) // 4 依然是整数，且和 latent 压缩逻辑对齐
         L = L // 4 * 4 + 1 if L % 4 != 0 else L - 3  # video frames
-        print(f"video frames after adjustment: {L}")
+        print(f"video frames after adjustment L: {L}")
         
         # T代表视频被压缩后的latent帧数，论文里说：
         # Each video, with a length T , is compressed into (T+3)/4 latent  frames using a pretrained 3D VAE, where the factor of 4 is the time compression ratio of the VAE.
         T = (L + 3) // 4  # latent frames
-        print(f"latent frames: {T}")
+        print(f"latent frames T: {T}")
 
         if self.args.i2v:
             if self.args.random_prefix_frames:
@@ -316,7 +316,6 @@ class WanInferencePipeline(nn.Module):
 
             msk = torch.zeros_like(img_lat.repeat(1, 1, T, 1, 1)[:,:1])
             print(f"msk shape: {msk.shape}")
-            # 把图片的 latent 表示在时间维度（T，latent帧数）上复制，作为每一帧的起始 embedding。
             image_cat = img_lat.repeat(1, 1, T, 1, 1)
             print(f"image_cat shape: {image_cat.shape}")
             # 除了第一帧，后续帧的 mask都设为 1，表示这些帧需要模型去生成（第一帧用输入图片）。这个msk的作用是为了在生成时，模型知道哪些帧是需要生成的，哪些帧是输入的。
