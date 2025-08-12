@@ -186,6 +186,7 @@ class OmniTrainingModule(pl.LightningModule):
     # TODO CFG
     # TODO 看lora是怎么弄的
     # TODO 训练的时候，视频大小是不是要跟之前的模型保持一致
+    # TODO 一定要搞清楚，模型每一步在干啥
     def forward_preprocess(self, batch):
         args = self.args
         device = self.device
@@ -340,14 +341,32 @@ class OmniTrainingModule(pl.LightningModule):
             audio_embs = torch.stack(audio_embs, dim=0)  # [B, ...]
         else:
             audio_embs = None  # 或 torch.zeros([B, ...])，看下游需求
+            
+        # TODO 构造图像条件image_emb，要check逻辑
+        B, C, T, H, W = video_latents.shape
+        prefix_lat_frame = 1
+
+        # 构造 image_cat: 取前prefix_lat_frame帧，repeat到T帧
+        image_cat = video_latents[:, :, :prefix_lat_frame]  # [B, C, prefix_lat_frame, H, W]
+        image_cat = image_cat.repeat(1, 1, T, 1, 1)    # [B, C, T, H, W]
+
+        # 构造 mask: 已知帧为0，其余为1
+        msk = torch.ones(B, 1, T, H, W, device=video_latents.device, dtype=video_latents.dtype)
+        msk[:, :, :prefix_lat_frame] = 0
+
+        # 拼接
+        image_emb = {}
+        image_emb['y'] = torch.cat([image_cat, msk], dim=1)  # [B, C+1, T, H, W]
+
+        target_device = device  # 或 next(self.parameters()).device
 
         batch_inputs = {
-            "input_latents": video_latents,  # [B, C, max_frame, H, W]
+            "input_latents": video_latents.to(target_device),
+            "image_emb": {k: v.to(target_device) for k, v in image_emb.items()},
             "prompt": prompts,
-            "audio_emb": audio_embs,         # [B, ...]
+            "audio_emb": audio_embs.to(target_device) if audio_embs is not None else None,
         }
-        
-        noise = torch.randn_like(video_latents)
+        noise = torch.randn_like(video_latents).to(target_device)
         batch_inputs["noise"] = noise
         
         print(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
