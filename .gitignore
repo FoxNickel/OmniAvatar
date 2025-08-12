@@ -5,3 +5,4 @@ examples/
 outputs/
 .vscode/
 log**
+**debug**
