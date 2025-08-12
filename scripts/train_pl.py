@@ -141,6 +141,10 @@ def main():
             ckpt_path=None if not os.path.exists(args.checkpoint_path) else args.checkpoint_path,
         )
 
-
+# import debugpy
+# if args.local_rank == 0:
+#     debugpy.listen(5678)
+#     print("Waiting for debugger attach...")
+#     debugpy.wait_for_client()
 if __name__ == "__main__":
     main()

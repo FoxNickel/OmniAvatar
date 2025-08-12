@@ -177,13 +177,10 @@ class OmniTrainingModule(pl.LightningModule):
         return loss
 
     # 这一步是对输入数据进行预处理，主要是将输入数据转换为模型需要的格式和参数。
+    # 视频处理方式：最大帧数为120帧，超过的随机切片，少于的pad到120帧，分辨率640x360。
+    # 音频处理方式：音频采样率为16kHz，音频长度与视频帧数对应。
+    # caption先统一使用原数据集里的caption，后续可以考虑使用翻译模型进行翻译。
     # TODO check对Diffusion的理解：训练时候的输入是原视频ground truth + audio + prompt
-    # TODO 出大问题，推理的时候长视频是通过迭代生成的，那训练的时候岂不是也只能训练L帧（L=60）的视频？
-    # 那我Koala里面的视频，都有100多帧，怎么训练？拆成多个小视频训练（对，切片）？
-    # 看了下还好，把大视频去掉就行。留300帧帧以内的，差不多max_tokens=7w
-    # TODO L以下的就不要了，L以上的怎么切（窗口，切L出来（随机切））
-    # TODO 切了之后对应的caption要处理，要不用youtube本身的title（要翻译）
-    # TODO 剩下的只下audio，训audio模型
     # TODO wave2vec看能不能用lora，看AudioPack、linear的权重大小
     # TODO cpu adam, checkpointing(deepspeed)
     # TODO 联合训练，模块打开就行
@@ -192,51 +189,87 @@ class OmniTrainingModule(pl.LightningModule):
     def forward_preprocess(self, batch):
         args = self.args
         device = self.device
-        batch_size = len(batch["video_path"])
-        prompts = batch["prompt"]
+        max_frame = 120
+        target_w, target_h = 640, 360
+
         video_paths = batch["video_path"]
         audio_paths = batch["audio_path"]
-        print(
-            f"[OmniTrainingModule] forward_preprocess -> prompt:{prompts}, video_path: {video_paths}, audio_path: {audio_paths}"
-        )
+        prompts = batch["prompt"]
+        batch_size = len(video_paths)
 
-        videos = []
-        for path in video_paths:
-            # 读取视频为 [T, H, W, C], float32, 0~1
-            video, _, _ = torchvision.io.read_video(path, pts_unit="sec")
-            # 转为 [C, T, H, W]
-            video = video.permute(3, 0, 1, 2)  # [C, T, H, W]
-            video = video.float() / 255.0
-            videos.append(video)
-        # pad 到同一帧数（如训练只取前L帧，或随机裁剪L帧）
-        # TODO 这里按之前说的处理，处理视频帧数
-        min_frames = min([v.shape[1] for v in videos])
-        # TODO 这里L应该是视频长度，要算出来的，不是这么来的。因为可能显存不够放不下。
-        # 以及视频和音频要匹配才对
-        L = min(args.max_frames, min_frames)  # 例如 args.max_frames=60
-        videos = [v[:, :L] for v in videos]
-        videos = torch.stack(videos, dim=0).to(device)  # [B, C, L, H, W]
+        videos, audios = [], []
+
+        for i in range(batch_size):
+            # 1. 读取视频
+            video, _, _ = torchvision.io.read_video(video_paths[i], pts_unit="sec")
+            # [T, H, W, C] -> [C, T, H, W]
+            video = video.permute(3, 0, 1, 2).float() / 255.0
+            # resize每帧到目标分辨率
+            video = torch.stack(
+                [
+                    F.interpolate(
+                        frame.unsqueeze(0),
+                        size=(target_h, target_w),
+                        mode="bilinear",
+                        align_corners=False,
+                    ).squeeze(0)
+                    for frame in video
+                ],
+                dim=1,
+            )  # [C, T, H, W]
+
+            T = video.shape[1]
+
+            # 2. 读取音频
+            audio, sr = librosa.load(audio_paths[i], sr=args.sample_rate)
+            samples_per_frame = int(args.sample_rate / args.fps)
+
+            # 3. 剪裁逻辑
+            if T <= max_frame:
+                video_clip = video[:, :T]
+                audio_clip = audio[: T * samples_per_frame]
+            else:
+                start_idx = np.random.randint(0, T - max_frame + 1)
+                video_clip = video[:, start_idx : start_idx + max_frame]
+                audio_clip = audio[
+                    start_idx * samples_per_frame : (start_idx + max_frame) * samples_per_frame
+                ]
+
+            # 4. 计算latent长度L
+            T_clip = video_clip.shape[1]
+            L = (T_clip + 3) // 4
+
+            # 5. pad到4*L
+            target_len = L * 4
+            if T_clip < target_len:
+                video_clip = F.pad(video_clip, (0, 0, 0, 0, 0, target_len - T_clip))
+                audio_clip = np.pad(audio_clip, (0, (target_len - T_clip) * samples_per_frame))
+
+            videos.append(video_clip)
+            audios.append(audio_clip)
+
+        videos = torch.stack(videos, dim=0).to(device)  # [B, C, max_frame, H, W]
         # 编码为 latent
         self.pipe.load_models_to_device(["vae"])
         with torch.no_grad():
             video_latents = self.pipe.encode_video(
                 videos.to(dtype=self.dtype)
-            )  # [B, latent_dim, L, H', W']
+            )  # [B, latent_dim, max_frame, H', W']
 
-        # 音频特征（如需batch，可补齐/裁剪到同一长度，否则用list）
+        # 音频特征
         audio_embs = []
         if args.use_audio:
-            for i in range(batch_size):
-                audio_path = audio_paths[i]
-                audio, sr = librosa.load(audio_path, sr=args.sample_rate)
+            for audio_clip in audios:
                 input_values = np.squeeze(
-                    self.wav_feature_extractor(audio, sampling_rate=16000).input_values
+                    self.wav_feature_extractor(
+                        audio_clip, sampling_rate=args.sample_rate
+                    ).input_values
                 )
                 input_values = torch.from_numpy(input_values).float().to(device)
                 input_values = input_values.unsqueeze(0)
                 with torch.no_grad():
                     hidden_states = self.audio_encoder(
-                        input_values, seq_len=L, output_hidden_states=True
+                        input_values, seq_len=max_frame, output_hidden_states=True
                     )
                     audio_embeddings = hidden_states.last_hidden_state
                     for mid_hidden_states in hidden_states.hidden_states:
@@ -247,16 +280,9 @@ class OmniTrainingModule(pl.LightningModule):
         else:
             audio_embs = [None] * batch_size
 
-        # TODO check视频和音频长度是否匹配
         batch_inputs = {
-            "input_latents": video_latents,  # [B, C, L, H, W]
+            "input_latents": video_latents,  # [B, C, max_frame, H, W]
             "prompt": prompts,
             "audio_emb": audio_embs,
         }
-        print(
-            f"[OmniTrainingModule] forward_preprocess -> batch_inputs keys: {batch_inputs.keys()}, batch_size: {batch_size}"
-        )
-        print(
-            f"[OmniTrainingModule] forward_preprocess -> batch_inputs input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {[a.shape if a is not None else None for a in batch_inputs['audio_emb']]}"
-        )
         return batch_inputs
