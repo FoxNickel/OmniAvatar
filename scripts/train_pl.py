@@ -92,33 +92,11 @@ def main():
             num_workers=6,
         )
 
-    # TODO 加载要训练的模型
+    # 加载要训练的模型
     trainer_model = OmniTrainingModule(args)
 
-    # TODO freeze module, 放到 OmniTrainingModule里
-    # for name, parameter in trainer_model.named_parameters():
-    #     if "video_inject" in name:
-    #         parameter.requires_grad = False
-    #         obj = get_nested_attr(trainer_model, name)
-    #         # obj.data = obj.data / 10
-    #     else:
-    #         parameter.requires_grad = True
-
-    # TODO 加载模型参数，放到 OmniTrainingModule里
-    # if args.mode == "train":
-    #     trainer_model.load_state_dict(
-    #         torch.load("models/t2v/model.ckpt", map_location="cpu"), strict=False
-    #     )
-    #     # trainer_model.load_state_dict(torch.load('/home/liujianzhi/data/LVDM/logs/ST/checkpoints/step=3000.ckpt/checkpoint/mp_rank_00_model_states.pt', map_location='cpu'), strict=True)
-    # else:
-    #     d = torch.load(args.resume, map_location="cpu")
-    #     d_con = {}
-    #     for t in d["module"]:
-    #         d_con[t[t.find(".") + 1 :]] = d["module"][t]
-    #     trainer_model.load_state_dict(d_con, strict=False)
-
-    # set the last linear layer of trainable model to zero
-    # import torch
+    # 设置可训练的模块
+    trainer_model.freeze_except(["dit","audio_encoder"])
 
     # TODO 这里不要吧？
     for name, p in trainer_model.named_parameters():
@@ -132,7 +110,6 @@ def main():
         #     obj.data.zero_()
 
     if args.mode == "train":
-        ### training
         print(f"[OmniTrainingModule]: start training with config: {config}")
         trainer.fit(
             model=trainer_model,

@@ -1,4 +1,3 @@
-import math
 import os
 import numpy as np
 import torch
@@ -7,7 +6,6 @@ import torchvision
 import torchvision.transforms as TT
 import pytorch_lightning as pl
 import torch.nn.functional as F
-import soundfile as sf
 from transformers import Wav2Vec2FeatureExtractor
 from peft import LoraConfig, inject_adapter_in_model
 
@@ -15,7 +13,6 @@ from OmniAvatar.models.model_manager import ModelManager
 from OmniAvatar.utils.io_utils import load_state_dict
 from OmniAvatar.wan_video import WanVideoPipeline
 from deepspeed.ops.adam import DeepSpeedCPUAdam
-from scripts.inference import match_size, resize_pad
 
 
 class OmniTrainingModule(pl.LightningModule):
@@ -24,25 +21,14 @@ class OmniTrainingModule(pl.LightningModule):
         super().__init__()
         self.args = args
 
-        # TODO 先去掉
-        # if args.dtype == "bf16":
-        #     self.dtype = torch.bfloat16
-        # elif args.dtype == "fp16":
-        #     self.dtype = torch.float16
-        # else:
-        #     self.dtype = torch.float32
-
         # 加载模型
         self.pipe = self.load_model()
         print(
             f"[OmniTrainingModule __init__]: Model loaded on {self.device}, dtype: {self.dtype}"
         )
 
-        # TODO 这里要添加需要冻结的模块，先注掉
-        # self.pipe.freeze([])
-
         if args.i2v:
-            # 把输入的图片转换为模型需要的张量格式
+            # 加载图像编码器
             chained_trainsforms = []
             chained_trainsforms.append(TT.ToTensor())
             self.transform = TT.Compose(chained_trainsforms)
@@ -77,21 +63,11 @@ class OmniTrainingModule(pl.LightningModule):
         model_manager = ModelManager(device="cpu", infer=True)
         model_manager.load_models(
             [args.dit_path.split(","), args.text_encoder_path, args.vae_path],
-            torch_dtype=(
-                getattr(torch, args.dtype)
-                if hasattr(torch, args.dtype)
-                else torch.float32
-            ),
             device="cpu",
         )
 
         pipe = WanVideoPipeline.from_model_manager(
             model_manager,
-            torch_dtype=(
-                getattr(torch, args.dtype)
-                if hasattr(torch, args.dtype)
-                else torch.float32
-            ),
             device=self.device,  # Lightning自动分配
             use_usp=True if args.sp_size > 1 else False,
             infer=True,
@@ -117,9 +93,10 @@ class OmniTrainingModule(pl.LightningModule):
                 f"[OmniTrainingModule load_model] -> load from {resume_path}, {len(missing_keys)} missing keys, {len(unexpected_keys)} unexpected keys"
             )
 
-        pipe.enable_vram_management(
-            num_persistent_param_in_dit=args.num_persistent_param_in_dit
-        )
+        # TODO 待定要不要，先去掉
+        # pipe.enable_vram_management(
+        #     num_persistent_param_in_dit=args.num_persistent_param_in_dit
+        # )
 
         return pipe
 
@@ -162,12 +139,13 @@ class OmniTrainingModule(pl.LightningModule):
 
     def configure_optimizers(self):
         print(f"[OmniTrainingModule] configure_optimizers")
-        return DeepSpeedCPUAdam(self.pipe.dit.parameters(), lr=float(self.args.lr))
+        # TODO 这里应该是传所有需要训练的参数吧？要改
+        return DeepSpeedCPUAdam(self.pipe.parameters(), lr=float(self.args.lr))
 
     # Lightning里面forward主要是inference用的
     # def forward(self, data):
     #     return self.pipe.forward(data)
-    # TODO 在这里调模型，算loss，训练
+
     def training_step(self, batch, batch_idx):
         print(
             f"[OmniTrainingModule] training_step -> batch keys: {batch.keys()}, batch_idx: {batch_idx}, batch_size: {len(batch['video_id'])}"
@@ -176,6 +154,20 @@ class OmniTrainingModule(pl.LightningModule):
         inputs = self.forward_preprocess(batch)
         loss = self.pipe.training_loss(**inputs)
         return loss
+
+    def freeze_except(self, trainable_model_names):
+        for name, parameter in self.named_parameters():
+            if any([key in name for key in trainable_model_names]):
+                parameter.requires_grad = True
+            else:
+                parameter.requires_grad = False
+
+    def freeze(self, frozen_model_names):
+        for name, parameter in self.named_parameters():
+            if any([key in name for key in frozen_model_names]):
+                parameter.requires_grad = False
+            else:
+                parameter.requires_grad = True
 
     # 这一步是对输入数据进行预处理，主要是将输入数据转换为模型需要的格式和参数。
     # 视频处理方式：最大帧数为120帧，超过的随机切片，少于的pad到120帧，分辨率640x360。
@@ -187,6 +179,7 @@ class OmniTrainingModule(pl.LightningModule):
     # TODO 联合训练，模块打开就行
     # TODO 一定量之后validate一下（1k左右），效果在20k的时候看，batch_size=3
     # TODO CFG
+    # TODO 看lora是怎么弄的
     def forward_preprocess(self, batch):
         args = self.args
         device = self.device
@@ -201,12 +194,18 @@ class OmniTrainingModule(pl.LightningModule):
         videos, audios = [], []
 
         for i in range(batch_size):
-            print(f"[OmniTrainingModule forward_preprocess] -> Loading video: {video_paths[i]}")
+            print(
+                f"[OmniTrainingModule forward_preprocess] -> Loading video: {video_paths[i]}"
+            )
             video, _, info = torchvision.io.read_video(video_paths[i], pts_unit="sec")
-            origin_video_fps = info['video_fps'] # TODO 这里应该就是用视频本身的fps吧？
+            origin_video_fps = info["video_fps"]  # TODO 这里应该就是用视频本身的fps吧？
             video_fps = int(round(origin_video_fps))
-            print(f"[OmniTrainingModule forward_preprocess] -> Original video fps: {origin_video_fps}, rounded fps: {video_fps}")
-            print(f"[OmniTrainingModule forward_preprocess] -> Raw video shape: {video.shape}")  # [T, H, W, C]
+            print(
+                f"[OmniTrainingModule forward_preprocess] -> Original video fps: {origin_video_fps}, rounded fps: {video_fps}"
+            )
+            print(
+                f"[OmniTrainingModule forward_preprocess] -> Raw video shape: {video.shape}"
+            )  # [T, H, W, C]
             video = video.float() / 255.0
             video = video.permute(0, 3, 1, 2)  # [T, C, H, W]
             video = torch.stack(
@@ -222,37 +221,57 @@ class OmniTrainingModule(pl.LightningModule):
                 dim=0,  # stack回 [T, C, H, W]
             )
             video = video.permute(1, 0, 2, 3)  # [C, T, H, W]
-            print(f"[OmniTrainingModule forward_preprocess] -> Resized video shape: {video.shape}")
+            print(
+                f"[OmniTrainingModule forward_preprocess] -> Resized video shape: {video.shape}"
+            )
 
             T = video.shape[1]
 
-            print(f"[OmniTrainingModule forward_preprocess] -> Loading audio: {audio_paths[i]}")
+            print(
+                f"[OmniTrainingModule forward_preprocess] -> Loading audio: {audio_paths[i]}"
+            )
             audio, sr = librosa.load(audio_paths[i], sr=args.sample_rate)
-            print(f"[OmniTrainingModule forward_preprocess] -> Raw audio shape: {audio.shape}, sr: {sr}")
+            print(
+                f"[OmniTrainingModule forward_preprocess] -> Raw audio shape: {audio.shape}, sr: {sr}"
+            )
             samples_per_frame = int(args.sample_rate / video_fps)
 
             if T <= max_frame:
                 video_clip = video[:, :T]
                 audio_clip = audio[: T * samples_per_frame]
-                print(f"[OmniTrainingModule forward_preprocess] -> Video shorter than max_frame, use first {T} frames")
+                print(
+                    f"[OmniTrainingModule forward_preprocess] -> Video shorter than max_frame, use first {T} frames"
+                )
             else:
                 start_idx = np.random.randint(0, T - max_frame + 1)
                 video_clip = video[:, start_idx : start_idx + max_frame]
                 audio_clip = audio[
-                    start_idx * samples_per_frame : (start_idx + max_frame) * samples_per_frame
+                    start_idx
+                    * samples_per_frame : (start_idx + max_frame)
+                    * samples_per_frame
                 ]
-                print(f"[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from {start_idx} to {start_idx + max_frame}")
+                print(
+                    f"[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from {start_idx} to {start_idx + max_frame}"
+                )
 
             T_clip = video_clip.shape[1]
             L = (T_clip + 3) // 4
             target_len = L * 4
             if T_clip < target_len:
-                print(f"[OmniTrainingModule forward_preprocess] -> Padding video from {T_clip} to {target_len} frames")
+                print(
+                    f"[OmniTrainingModule forward_preprocess] -> Padding video from {T_clip} to {target_len} frames"
+                )
                 video_clip = F.pad(video_clip, (0, 0, 0, 0, 0, target_len - T_clip))
-                audio_clip = np.pad(audio_clip, (0, (target_len - T_clip) * samples_per_frame))
+                audio_clip = np.pad(
+                    audio_clip, (0, (target_len - T_clip) * samples_per_frame)
+                )
 
-            print(f"[OmniTrainingModule forward_preprocess] -> Final video_clip shape: {video_clip.shape}")
-            print(f"[OmniTrainingModule forward_preprocess] -> Final audio_clip shape: {audio_clip.shape}")
+            print(
+                f"[OmniTrainingModule forward_preprocess] -> Final video_clip shape: {video_clip.shape}"
+            )
+            print(
+                f"[OmniTrainingModule forward_preprocess] -> Final audio_clip shape: {audio_clip.shape}"
+            )
 
             # # 保存处理后的视频和音频
             # save_dir = "./debug_preprocess"
@@ -269,14 +288,20 @@ class OmniTrainingModule(pl.LightningModule):
             audios.append(audio_clip)
 
         videos = torch.stack(videos, dim=0).to(device)  # [B, C, max_frame, H, W]
-        print(f"[OmniTrainingModule forward_preprocess] -> All videos stacked shape: {videos.shape}")
+        print(
+            f"[OmniTrainingModule forward_preprocess] -> All videos stacked shape: {videos.shape}"
+        )
 
         self.pipe.load_models_to_device(["vae"])
         with torch.no_grad():
             video_latents = self.pipe.encode_video(
-                videos.to(dtype=self.dtype)
+                videos.to(
+                    device=device, dtype=next(self.parameters()).dtype
+                )  # trainer是fp16，但这里是32，要转一下，取参数类型即可
             )  # [B, latent_dim, max_frame, H', W']
-        print(f"[OmniTrainingModule forward_preprocess] -> Latent shape: {video_latents.shape}")
+        print(
+            f"[OmniTrainingModule forward_preprocess] -> Latent shape: {video_latents.shape}"
+        )
 
         audio_embs = []
         if args.use_audio:
@@ -298,7 +323,9 @@ class OmniTrainingModule(pl.LightningModule):
                             (audio_embeddings, mid_hidden_states), -1
                         )
                 audio_embs.append(audio_embeddings.squeeze(0))
-                print(f"[OmniTrainingModule forward_preprocess] -> Audio embedding {idx} shape: {audio_embeddings.shape}")
+                print(
+                    f"[OmniTrainingModule forward_preprocess] -> Audio embedding {idx} shape: {audio_embeddings.shape}"
+                )
         else:
             audio_embs = [None] * batch_size
 

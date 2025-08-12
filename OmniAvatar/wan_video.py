@@ -195,6 +195,7 @@ class WanVideoPipeline(BasePipeline):
         return {"use_unified_sequence_parallel": self.use_unified_sequence_parallel}
 
     def training_loss(self, **inputs):
+        print(f"[WanVideoPipeline] training_loss -> input keys: {inputs.keys()}")
         max_timestep_boundary = int(inputs.get("max_timestep_boundary", 1) * self.scheduler.num_train_timesteps)
         min_timestep_boundary = int(inputs.get("min_timestep_boundary", 0) * self.scheduler.num_train_timesteps)
         timestep_id = torch.randint(min_timestep_boundary, max_timestep_boundary, (1,))
@@ -210,10 +211,12 @@ class WanVideoPipeline(BasePipeline):
         return loss
 
     def model_fn(self, timestep: torch.Tensor = None, **inputs):
+        print(f"[WanVideoPipeline] model_fn -> input keys: {inputs.keys()}")
         latents = inputs.get("latents", None)
         prompt = inputs.get("prompt", "")
         image_emb = inputs.get("image_emb", {})
         audio_emb = inputs.get("audio_emb", {})
+        print(f"[WanVideoPipeline] model_fn -> latents shape: {latents.shape}, timestep: {timestep}, prompt: {prompt}, image_emb keys: {image_emb.keys()}, audio_emb keys: {audio_emb.keys()}")
 
         # Encode prompts
         self.load_models_to_device(["text_encoder"])
@@ -223,6 +226,7 @@ class WanVideoPipeline(BasePipeline):
         extra_input = self.prepare_extra_input(latents)
 
         # TODO 没有tea cache
+        print(f"[WanVideoPipeline] model_fn -> run dit...")
         noise_pred_posi = self.dit(
             latents,
             timestep=timestep,
