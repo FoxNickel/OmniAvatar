@@ -137,6 +137,11 @@ class OmniTrainingModule(pl.LightningModule):
                 f"[OmniTrainingModule add_lora_to_model] -> {num_updated_keys} parameters are loaded from {pretrained_lora_path}. {num_unexpected_keys} parameters are unexpected."
             )
 
+    def on_fit_start(self):
+        # 模型初始化的时候，device是cpu，等到fit开始的时候，Lightning会自动分配设备
+        print(f"[OmniTrainingModule] on_fit_start -> device: {self.device}, param device: {next(self.parameters()).device}")
+        self.pipe.device = next(self.parameters()).device
+    
     def configure_optimizers(self):
         print(f"[OmniTrainingModule] configure_optimizers")
         # 这里应该是传所有需要训练的参数吧？没问题，传给Adam，但他只会更新没有freeze的
@@ -183,6 +188,7 @@ class OmniTrainingModule(pl.LightningModule):
     def forward_preprocess(self, batch):
         args = self.args
         device = self.device
+        print(f"[OmniTrainingModule forward_preprocess] -> device: {device}")
         max_frame = 120
         target_w, target_h = 640, 360
 
@@ -289,7 +295,7 @@ class OmniTrainingModule(pl.LightningModule):
 
         videos = torch.stack(videos, dim=0).to(device)  # [B, C, max_frame, H, W]
         print(
-            f"[OmniTrainingModule forward_preprocess] -> All videos stacked shape: {videos.shape}"
+            f"[OmniTrainingModule forward_preprocess] -> All videos stacked shape: {videos.shape}, videos device: {videos.device}"
         )
 
         self.pipe.load_models_to_device(["vae"])
@@ -311,7 +317,7 @@ class OmniTrainingModule(pl.LightningModule):
                         audio_clip, sampling_rate=args.sample_rate
                     ).input_values
                 )
-                input_values = torch.from_numpy(input_values).float().to(device)
+                input_values = torch.from_numpy(input_values).to(device=device, dtype=next(self.audio_encoder.parameters()).dtype)
                 input_values = input_values.unsqueeze(0)
                 with torch.no_grad():
                     hidden_states = self.audio_encoder(
@@ -326,13 +332,19 @@ class OmniTrainingModule(pl.LightningModule):
                 print(
                     f"[OmniTrainingModule forward_preprocess] -> Audio embedding {idx} shape: {audio_embeddings.shape}"
                 )
+            # 这里将list合成batch tensor
+            audio_embs = torch.stack(audio_embs, dim=0)  # [B, ...]
         else:
-            audio_embs = [None] * batch_size
+            audio_embs = None  # 或 torch.zeros([B, ...])，看下游需求
 
         batch_inputs = {
             "input_latents": video_latents,  # [B, C, max_frame, H, W]
             "prompt": prompts,
-            "audio_emb": audio_embs,
+            "audio_emb": audio_embs,         # [B, ...]
         }
-        print(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready")
+        
+        noise = torch.randn_like(video_latents)
+        batch_inputs["noise"] = noise
+        
+        print(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
         return batch_inputs

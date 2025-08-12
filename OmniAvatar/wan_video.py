@@ -184,6 +184,7 @@ class WanVideoPipeline(BasePipeline):
         return {}
 
     def encode_video(self, input_video, tiled=True, tile_size=(34, 34), tile_stride=(18, 16)): # input_video[b,c,f,h,w]
+        print(f"[WanVideoPipeline] encode_video -> input_video device: {input_video.device}, dtype: {input_video.dtype}")
         latents = self.vae.encode(input_video, device=self.device, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
         return latents
 
@@ -195,9 +196,13 @@ class WanVideoPipeline(BasePipeline):
         return {"use_unified_sequence_parallel": self.use_unified_sequence_parallel}
 
     def training_loss(self, **inputs):
-        print(f"[WanVideoPipeline] training_loss -> input keys: {inputs.keys()}")
+        print(f"[WanVideoPipeline] training_loss -> input keys: {inputs.keys()}, self.torch_dtype = {self.torch_dtype}, self.device = {self.device}")
+        print(f"[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: {self.scheduler.num_train_timesteps}, len(timesteps): {len(self.scheduler.timesteps)}, timesteps: {self.scheduler.timesteps}")
         max_timestep_boundary = int(inputs.get("max_timestep_boundary", 1) * self.scheduler.num_train_timesteps)
         min_timestep_boundary = int(inputs.get("min_timestep_boundary", 0) * self.scheduler.num_train_timesteps)
+        # 防止越界
+        max_timestep_boundary = min(max_timestep_boundary, len(self.scheduler.timesteps))
+        min_timestep_boundary = max(min_timestep_boundary, 0)
         timestep_id = torch.randint(min_timestep_boundary, max_timestep_boundary, (1,))
         timestep = self.scheduler.timesteps[timestep_id].to(dtype=self.torch_dtype, device=self.device)
 
@@ -216,7 +221,7 @@ class WanVideoPipeline(BasePipeline):
         prompt = inputs.get("prompt", "")
         image_emb = inputs.get("image_emb", {})
         audio_emb = inputs.get("audio_emb", {})
-        print(f"[WanVideoPipeline] model_fn -> latents shape: {latents.shape}, timestep: {timestep}, prompt: {prompt}, image_emb keys: {image_emb.keys()}, audio_emb keys: {audio_emb.keys()}")
+        print(f"[WanVideoPipeline] model_fn -> latents shape: {latents.shape}, timestep: {timestep}, audio_emb shape: {audio_emb.shape}, prompt: {prompt}, image_emb keys: {image_emb.keys()}")
 
         # Encode prompts
         self.load_models_to_device(["text_encoder"])
@@ -232,7 +237,7 @@ class WanVideoPipeline(BasePipeline):
             timestep=timestep,
             **prompt_emb_posi,
             **image_emb,
-            **audio_emb,
+            audio_emb=audio_emb,
             **extra_input,
         )
         return noise_pred_posi
