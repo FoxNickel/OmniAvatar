@@ -139,8 +139,8 @@ class OmniTrainingModule(pl.LightningModule):
 
     def configure_optimizers(self):
         print(f"[OmniTrainingModule] configure_optimizers")
-        # TODO 这里应该是传所有需要训练的参数吧？要改
-        return DeepSpeedCPUAdam(self.pipe.parameters(), lr=float(self.args.lr))
+        # 这里应该是传所有需要训练的参数吧？没问题，传给Adam，但他只会更新没有freeze的
+        return DeepSpeedCPUAdam(self.parameters(), lr=float(self.args.lr))
 
     # Lightning里面forward主要是inference用的
     # def forward(self, data):
