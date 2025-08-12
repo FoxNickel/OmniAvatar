@@ -210,6 +210,7 @@ class WanVideoPipeline(BasePipeline):
         training_target = self.scheduler.training_target(inputs["input_latents"], inputs["noise"], timestep)
 
         noise_pred = self.model_fn(**inputs, timestep=timestep)
+        print(f"[WanVideoPipeline] training_loss -> noise_pred shape: {noise_pred.shape}, dtype: {noise_pred.dtype}, device: {noise_pred.device}, training_target shape: {training_target.shape}, dtype: {training_target.dtype}, device: {training_target.device}")
 
         loss = torch.nn.functional.mse_loss(noise_pred.float(), training_target.float())
         loss = loss * self.scheduler.training_weight(timestep)
@@ -240,6 +241,7 @@ class WanVideoPipeline(BasePipeline):
             audio_emb=audio_emb,
             **extra_input,
         )
+        print(f"[WanVideoPipeline] model_fn -> noise_pred_posi shape: {noise_pred_posi.shape}, dtype: {noise_pred_posi.dtype}, device: {noise_pred_posi.device}")
         return noise_pred_posi
 
     @torch.no_grad()

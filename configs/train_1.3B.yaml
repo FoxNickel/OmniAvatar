@@ -31,7 +31,7 @@ overlap_frame: 13 # must be 1 + 4*n
 guidance_scale: 4.5
 audio_scale: 
 num_steps: 50
-fps: 25
+fps: 20
 sample_rate: 16000
 negative_prompt: "Vivid color tones, background/camera moving quickly, screen switching, subtitles and special effects, mutation, overexposed, static, blurred details, subtitles, style, work, painting, image, still, overall grayish, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fingers merging, motionless image, chaotic background, three legs, crowded background with many people, walking backward"
 silence_duration_s: 0.3
@@ -42,7 +42,7 @@ tea_cache_l1_thresh: 0 # 0.14 The larger this value is, the faster the speed, bu
 dataset_base_path: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1
 name: train_1.3B
 savedir: /mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs
-batch_size: 4
+batch_size: 1
 # nodes代表分布式训练的节点数，devices代表每个节点上的GPU数量
 nodes: 1
 devices: 1

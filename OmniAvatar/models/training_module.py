@@ -191,7 +191,7 @@ class OmniTrainingModule(pl.LightningModule):
         args = self.args
         device = self.device
         print(f"[OmniTrainingModule forward_preprocess] -> device: {device}")
-        max_frame = 120
+        max_frame = 10
         max_frame = max_frame // 4 * 4 + 1 if max_frame % 4 != 0 else max_frame - 3  # 对齐inference的调整
         target_w, target_h = 640, 360
 
