@@ -390,6 +390,7 @@ class WanModel(torch.nn.Module):
             tea_cache = None,                     # 分布式推理缓存
             **kwargs,
             ):
+        print(f"[WanModel] Forward pass with x shape: {x.shape}, timestep: {timestep.shape}, context shape: {context.shape}, y shape: {y.shape if y is not None else 'None'}, audio_emb shape: {audio_emb.shape if audio_emb is not None else 'None'}")
         # 1. 时间步嵌入与调制参数
         t = self.time_embedding(
             sinusoidal_embedding_1d(self.freq_dim, timestep))
@@ -404,12 +405,13 @@ class WanModel(torch.nn.Module):
         # 4. 音频条件处理（如果启用）
         if audio_emb != None and self.use_audio: # TODO  cache
             audio_emb = audio_emb.permute(0, 2, 1)[:, :, :, None, None] # 调整维度
-            audio_emb = torch.cat([audio_emb[:, :, :1].repeat(1, 1, 3, 1, 1), audio_emb], 2) # 1, 768, 44, 1, 1 # 补齐长度
+            audio_emb = torch.cat([audio_emb[:, :, :1].repeat(1, 1, 3, 1, 1), audio_emb], 2) # 把第三维的第一个拿出来，repeat 3次
             audio_emb = self.audio_proj(audio_emb) # 投影到隐藏层
 
             audio_emb = torch.concat([audio_cond_proj(audio_emb) for audio_cond_proj in self.audio_cond_projs], 0)  # 多层融合
 
         # 5. 拼接图片条件（如mask），做patch embedding
+        # 训练时，x 是视频的 latent，y 是图片条件（如图片 latent + mask），拼接后送入 patch embedding 和 patchify
         x = torch.cat([x, y], dim=1)  # 拼接图片条件
         x = self.patch_embedding(x)   # 3D卷积分块升维
         x, (f, h, w) = self.patchify(x)  # 展平成patch序列

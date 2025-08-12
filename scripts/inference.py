@@ -310,6 +310,7 @@ class WanInferencePipeline(nn.Module):
         if args.i2v:
             # 加载 VAE 并编码图片为 latent
             self.pipe.load_models_to_device(['vae'])
+            print(f"[inference]: image.shape {image.shape}")
             img_lat = self.pipe.encode_video(image.to(dtype=self.dtype)).to(self.device)
             print(f"img_lat shape: {img_lat.shape}, prefix_lat_frame: {prefix_lat_frame}")
 

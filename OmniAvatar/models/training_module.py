@@ -185,11 +185,13 @@ class OmniTrainingModule(pl.LightningModule):
     # TODO 一定量之后validate一下（1k左右），效果在20k的时候看，batch_size=3
     # TODO CFG
     # TODO 看lora是怎么弄的
+    # TODO 训练的时候，视频大小是不是要跟之前的模型保持一致
     def forward_preprocess(self, batch):
         args = self.args
         device = self.device
         print(f"[OmniTrainingModule forward_preprocess] -> device: {device}")
         max_frame = 120
+        max_frame = max_frame // 4 * 4 + 1 if max_frame % 4 != 0 else max_frame - 3  # 对齐inference的调整
         target_w, target_h = 640, 360
 
         video_paths = batch["video_path"]
@@ -231,7 +233,7 @@ class OmniTrainingModule(pl.LightningModule):
                 f"[OmniTrainingModule forward_preprocess] -> Resized video shape: {video.shape}"
             )
 
-            T = video.shape[1]
+            L = video.shape[1]
 
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Loading audio: {audio_paths[i]}"
@@ -242,14 +244,15 @@ class OmniTrainingModule(pl.LightningModule):
             )
             samples_per_frame = int(args.sample_rate / video_fps)
 
-            if T <= max_frame:
-                video_clip = video[:, :T]
-                audio_clip = audio[: T * samples_per_frame]
+            # TODO 短于max的直接丢，不能扩展，扩展会让模型学错东西
+            if L <= max_frame:
+                video_clip = video[:, :L]
+                audio_clip = audio[: L * samples_per_frame]
                 print(
                     f"[OmniTrainingModule forward_preprocess] -> Video shorter than max_frame, use first {T} frames"
                 )
             else:
-                start_idx = np.random.randint(0, T - max_frame + 1)
+                start_idx = np.random.randint(0, L - max_frame + 1)
                 video_clip = video[:, start_idx : start_idx + max_frame]
                 audio_clip = audio[
                     start_idx
@@ -260,17 +263,18 @@ class OmniTrainingModule(pl.LightningModule):
                     f"[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from {start_idx} to {start_idx + max_frame}"
                 )
 
-            T_clip = video_clip.shape[1]
-            L = (T_clip + 3) // 4
+            L_clip = video_clip.shape[1]
+            T = (L_clip + 3) // 4
             target_len = L * 4
-            if T_clip < target_len:
-                print(
-                    f"[OmniTrainingModule forward_preprocess] -> Padding video from {T_clip} to {target_len} frames"
-                )
-                video_clip = F.pad(video_clip, (0, 0, 0, 0, 0, target_len - T_clip))
-                audio_clip = np.pad(
-                    audio_clip, (0, (target_len - T_clip) * samples_per_frame)
-                )
+            print(f"[OmniTrainingModule forward_preprocess] -> L_clip: {L_clip}, T: {T}, target_len: {target_len}")
+            # if L_clip < target_len:
+            #     print(
+            #         f"[OmniTrainingModule forward_preprocess] -> Padding video from {L_clip} to {target_len} frames"
+            #     )
+            #     video_clip = F.pad(video_clip, (0, 0, 0, 0, 0, target_len - L_clip))
+            #     audio_clip = np.pad(
+            #         audio_clip, (0, (target_len - L_clip) * samples_per_frame)
+            #     )
 
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Final video_clip shape: {video_clip.shape}"
@@ -293,7 +297,7 @@ class OmniTrainingModule(pl.LightningModule):
             videos.append(video_clip)
             audios.append(audio_clip)
 
-        videos = torch.stack(videos, dim=0).to(device)  # [B, C, max_frame, H, W]
+        videos = torch.stack(videos, dim=0).to(device)  # [B, C, T, H, W]
         print(
             f"[OmniTrainingModule forward_preprocess] -> All videos stacked shape: {videos.shape}, videos device: {videos.device}"
         )
@@ -304,7 +308,7 @@ class OmniTrainingModule(pl.LightningModule):
                 videos.to(
                     device=device, dtype=next(self.parameters()).dtype
                 )  # trainer是fp16，但这里是32，要转一下，取参数类型即可
-            )  # [B, latent_dim, max_frame, H', W']
+            )  # [B, latent_dim, T, H', W']
         print(
             f"[OmniTrainingModule forward_preprocess] -> Latent shape: {video_latents.shape}"
         )

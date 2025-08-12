@@ -42,6 +42,7 @@ class AudioPack(nn.Module):
             vid: torch.Tensor,
     ) -> torch.Tensor:
         t, h, w = self.patch_size
+        print(f"[AudioPack forward] vid shape: {vid.shape}, t, h, w: {t}, {h}, {w}")
         vid = rearrange(vid, "b c (T t) (H h) (W w) -> b T H W (t h w c)", t=t, h=h, w=w)
         vid = self.proj(vid)
         if self.norm_out is not None:
