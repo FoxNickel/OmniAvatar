@@ -27,26 +27,24 @@ class OmniTrainingModule(pl.LightningModule):
             f"[OmniTrainingModule __init__]: Model loaded on {self.device}, dtype: {self.dtype}"
         )
 
-        if args.i2v:
-            # 加载图像编码器
-            chained_trainsforms = []
-            chained_trainsforms.append(TT.ToTensor())
-            self.transform = TT.Compose(chained_trainsforms)
+        # 加载图像编码器
+        chained_trainsforms = []
+        chained_trainsforms.append(TT.ToTensor())
+        self.transform = TT.Compose(chained_trainsforms)
 
-        if args.use_audio:
-            # 加载音频特征提取器和音频模型
-            from OmniAvatar.models.wav2vec import Wav2VecModel
+        # 加载音频特征提取器和音频模型
+        from OmniAvatar.models.wav2vec import Wav2VecModel
 
-            # 提特征
-            self.wav_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
-                args.wav2vec_path
-            )
-            # 经过模型处理
-            self.audio_encoder = Wav2VecModel.from_pretrained(
-                args.wav2vec_path, local_files_only=True
-            ).to(device=self.device)
-            self.audio_encoder.train()
-            self.audio_encoder.feature_extractor._freeze_parameters()
+        # 提特征
+        self.wav_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
+            args.wav2vec_path
+        )
+        # 经过模型处理
+        self.audio_encoder = Wav2VecModel.from_pretrained(
+            args.wav2vec_path, local_files_only=True
+        ).to(device=self.device)
+        self.audio_encoder.train()
+        self.audio_encoder.feature_extractor._freeze_parameters()
 
     def load_model(self):
         # 用现有的Omni权重初始化模型
@@ -311,32 +309,29 @@ class OmniTrainingModule(pl.LightningModule):
         )
 
         audio_embs = []
-        if args.use_audio:
-            for idx, audio_clip in enumerate(audios):
-                input_values = np.squeeze(
-                    self.wav_feature_extractor(
-                        audio_clip, sampling_rate=args.sample_rate
-                    ).input_values
+        for idx, audio_clip in enumerate(audios):
+            input_values = np.squeeze(
+                self.wav_feature_extractor(
+                    audio_clip, sampling_rate=args.sample_rate
+                ).input_values
+            )
+            input_values = torch.from_numpy(input_values).to(device=device, dtype=next(self.audio_encoder.parameters()).dtype)
+            input_values = input_values.unsqueeze(0)
+            with torch.no_grad():
+                hidden_states = self.audio_encoder(
+                    input_values, seq_len=max_frame, output_hidden_states=True
                 )
-                input_values = torch.from_numpy(input_values).to(device=device, dtype=next(self.audio_encoder.parameters()).dtype)
-                input_values = input_values.unsqueeze(0)
-                with torch.no_grad():
-                    hidden_states = self.audio_encoder(
-                        input_values, seq_len=max_frame, output_hidden_states=True
+                audio_embeddings = hidden_states.last_hidden_state
+                for mid_hidden_states in hidden_states.hidden_states:
+                    audio_embeddings = torch.cat(
+                        (audio_embeddings, mid_hidden_states), -1
                     )
-                    audio_embeddings = hidden_states.last_hidden_state
-                    for mid_hidden_states in hidden_states.hidden_states:
-                        audio_embeddings = torch.cat(
-                            (audio_embeddings, mid_hidden_states), -1
-                        )
-                audio_embs.append(audio_embeddings.squeeze(0))
-                print(
-                    f"[OmniTrainingModule forward_preprocess] -> Audio embedding {idx} shape: {audio_embeddings.shape}"
-                )
-            # 这里将list合成batch tensor
-            audio_embs = torch.stack(audio_embs, dim=0)  # [B, ...]
-        else:
-            audio_embs = None  # 或 torch.zeros([B, ...])，看下游需求
+            audio_embs.append(audio_embeddings.squeeze(0))
+            print(
+                f"[OmniTrainingModule forward_preprocess] -> Audio embedding {idx} shape: {audio_embeddings.shape}"
+            )
+        # 这里将list合成batch tensor
+        audio_embs = torch.stack(audio_embs, dim=0)  # [B, ...]
             
         # TODO 构造图像条件image_emb，要check逻辑
         B, C, T, H, W = video_latents.shape
