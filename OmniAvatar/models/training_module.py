@@ -27,19 +27,11 @@ class OmniTrainingModule(pl.LightningModule):
             f"[OmniTrainingModule __init__]: Model loaded on {self.device}, dtype: {self.dtype}"
         )
 
-        # 加载图像编码器
-        chained_trainsforms = []
-        chained_trainsforms.append(TT.ToTensor())
-        self.transform = TT.Compose(chained_trainsforms)
-
-        # 加载音频特征提取器和音频模型
+        # 加载音频模型Wav2Vec
         from OmniAvatar.models.wav2vec import Wav2VecModel
-
-        # 提特征
         self.wav_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
             args.wav2vec_path
         )
-        # 经过模型处理
         self.audio_encoder = Wav2VecModel.from_pretrained(
             args.wav2vec_path, local_files_only=True
         ).to(device=self.device)
@@ -204,6 +196,7 @@ class OmniTrainingModule(pl.LightningModule):
 
         videos, audios = [], []
 
+        # 处理原视频
         for i in range(batch_size):
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Loading video: {video_paths[i]}"
@@ -295,6 +288,7 @@ class OmniTrainingModule(pl.LightningModule):
             f"[OmniTrainingModule forward_preprocess] -> All videos stacked shape: {videos.shape}, videos device: {videos.device}"
         )
 
+        # 视频过vae
         self.pipe.load_models_to_device(["vae"])
         with torch.no_grad():
             # videos=[1, 3, 9, 360, 640]
@@ -308,6 +302,7 @@ class OmniTrainingModule(pl.LightningModule):
             f"[OmniTrainingModule forward_preprocess] -> Latent shape: {video_latents.shape}"
         )
 
+        # 提音频特征
         audio_embs = []
         for idx, audio_clip in enumerate(audios):
             input_values = np.squeeze(
@@ -336,21 +331,18 @@ class OmniTrainingModule(pl.LightningModule):
         # TODO 构造图像条件image_emb，要check逻辑
         B, C, T, H, W = video_latents.shape
         prefix_lat_frame = 1
-
         # 构造 image_cat: 取前prefix_lat_frame帧，repeat到T帧
         image_cat = video_latents[:, :, :prefix_lat_frame]  # [B, C, prefix_lat_frame, H, W]
         image_cat = image_cat.repeat(1, 1, T, 1, 1)    # [B, C, T, H, W]
-
         # 构造 mask: 已知帧为0，其余为1
         msk = torch.ones(B, 1, T, H, W, device=video_latents.device, dtype=video_latents.dtype)
         msk[:, :, :prefix_lat_frame] = 0
-
         # 拼接
         image_emb = {}
         image_emb['y'] = torch.cat([image_cat, msk], dim=1)  # [B, C+1, T, H, W]
 
+        # TODO 组装数据，放到目标设备上，这里不一定要放到cuda
         target_device = device  # 或 next(self.parameters()).device
-
         batch_inputs = {
             "input_latents": video_latents.to(target_device),
             "image_emb": {k: v.to(target_device) for k, v in image_emb.items()},
