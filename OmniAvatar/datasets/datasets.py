@@ -193,8 +193,8 @@ class WanVideoDataset(torch.utils.data.Dataset):
         
         # 从预处理好的csv或者json里面读出来, 是个数组
         metadata = pd.read_csv(metadata_path)
-        self.data = [metadata.iloc[i].to_dict() for i in range(len(metadata))]
-        None
+        data_len = min(args.debug_data_len, len(metadata)) if args.debug else len(metadata)
+        self.data = [metadata.iloc[i].to_dict() for i in range(data_len)]
     
     def __getitem__(self, data_id):
         data = self.data[data_id % len(self.data)].copy()
@@ -213,8 +213,8 @@ class WanVideoValidationDataset(torch.utils.data.Dataset):
         
         # 从预处理好的csv或者json里面读出来, 是个数组
         metadata = pd.read_csv(metadata_path)
-        self.data = [metadata.iloc[i].to_dict() for i in range(len(metadata))]
-        None
+        data_len = min(args.debug_data_len, len(metadata)) if args.debug else len(metadata)
+        self.data = [metadata.iloc[i].to_dict() for i in range(data_len)]
     
     def __getitem__(self, data_id):
         data = self.data[data_id % len(self.data)].copy()
