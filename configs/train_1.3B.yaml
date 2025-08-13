@@ -1,5 +1,5 @@
 # 预训练模型路径
-dtype: "fp16"
+dtype: "fp16" # TODO bf16
 text_encoder_path: pretrained_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth
 image_encoder_path: None
 # dit 是扩散生成的主模型（Diffusion Transformer），负责内容生成。（transformer）
@@ -51,5 +51,5 @@ mode: train
 checkpoint_path: ""
 lr: 1e-4
 max_frames: 120
-debug: True
-debug_data_len: 5
+debug: False
+debug_data_len: 10

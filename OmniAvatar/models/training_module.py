@@ -2,6 +2,7 @@ import os
 import numpy as np
 import torch
 import librosa
+import time
 import torchvision
 import torchvision.transforms as TT
 import pytorch_lightning as pl
@@ -148,7 +149,19 @@ class OmniTrainingModule(pl.LightningModule):
         )
 
         inputs = self.forward_preprocess(batch)
+        
+        for k, v in inputs.items():
+            if isinstance(v, torch.Tensor):
+                print(f"[Check] {k}: nan={torch.isnan(v).any().item()}, inf={torch.isinf(v).any().item()}, shape={v.shape}")
+                
         loss = self.pipe.training_loss(**inputs)
+        
+        # 检查 loss 是否为 nan 或 inf
+        print(f"[Check] loss: nan={torch.isnan(loss).item()}, inf={torch.isinf(loss).item()}, value={loss.item()}")
+
+        
+        print(f"[OmniTrainingModule] training_step -> loss: {loss.item()}")
+        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, batch_size=len(batch['video_id']))
         return loss
 
     def freeze_except(self, trainable_model_names):
@@ -182,6 +195,10 @@ class OmniTrainingModule(pl.LightningModule):
         args = self.args
         device = self.device
         print(f"[OmniTrainingModule forward_preprocess] -> device: {device}")
+        time_start = time.time()
+
+        # 计时：数据预处理（视频+音频加载与裁剪）
+        t_preprocess_start = time.time()
         max_frame = 25
         max_frame = max_frame // 4 * 4 + 1 if max_frame % 4 != 0 else max_frame - 3  # 对齐inference的调整
         # TODO 这里360经过vae之后，会变成360/8=45，然后进到模型之后，经过3d卷积的时候，会变成22，导致最后输出的时候跟原图h不一致。
@@ -201,7 +218,10 @@ class OmniTrainingModule(pl.LightningModule):
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Loading video: {video_paths[i]}"
             )
+            t_read_start = time.time()
             video, _, info = torchvision.io.read_video(video_paths[i], pts_unit="sec")
+            t_read_end = time.time()
+            print(f"[Timer] 视频读取耗时: {t_read_end - t_read_start:.3f} 秒")
             origin_video_fps = info["video_fps"]  # TODO 这里应该就是用视频本身的fps吧？
             video_fps = int(round(origin_video_fps))
             print(
@@ -210,20 +230,10 @@ class OmniTrainingModule(pl.LightningModule):
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Raw video shape: {video.shape}"
             )  # [T, H, W, C]
+            # [T, C, H, W] -> 一次性插值
             video = video.float() / 255.0
             video = video.permute(0, 3, 1, 2)  # [T, C, H, W]
-            video = torch.stack(
-                [
-                    F.interpolate(
-                        frame.unsqueeze(0),
-                        size=(target_h, target_w),
-                        mode="bilinear",
-                        align_corners=False,
-                    ).squeeze(0)
-                    for frame in video
-                ],
-                dim=0,  # stack回 [T, C, H, W]
-            )
+            video = F.interpolate(video, size=(target_h, target_w), mode="bilinear", align_corners=False)
             video = video.permute(1, 0, 2, 3)  # [C, T, H, W]
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Resized video shape: {video.shape}"
@@ -234,7 +244,10 @@ class OmniTrainingModule(pl.LightningModule):
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Loading audio: {audio_paths[i]}"
             )
+            t_audio_read_start = time.time()
             audio, sr = librosa.load(audio_paths[i], sr=args.sample_rate)
+            t_audio_read_end = time.time()
+            print(f"[Timer] 音频读取耗时: {t_audio_read_end - t_audio_read_start:.3f} 秒")
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Raw audio shape: {audio.shape}, sr: {sr}"
             )
@@ -282,7 +295,11 @@ class OmniTrainingModule(pl.LightningModule):
 
             videos.append(video_clip)
             audios.append(audio_clip)
-
+        t_preprocess_end = time.time()
+        print(f"[Timer] 数据预处理耗时: {t_preprocess_end - t_preprocess_start:.3f} 秒")
+        
+        # 计时：VAE编码
+        t_vae_start = time.time()
         videos = torch.stack(videos, dim=0).to(device)  # [B, C, T, H, W]
         print(
             f"[OmniTrainingModule forward_preprocess] -> All videos stacked shape: {videos.shape}, videos device: {videos.device}"
@@ -301,8 +318,13 @@ class OmniTrainingModule(pl.LightningModule):
         print(
             f"[OmniTrainingModule forward_preprocess] -> Latent shape: {video_latents.shape}"
         )
+        t_vae_end = time.time()
+        print(f"[Timer] VAE编码耗时: {t_vae_end - t_vae_start:.3f} 秒")
+
 
         # 提音频特征
+        # 计时：Wav2Vec音频特征提取
+        t_wav2vec_start = time.time()
         audio_embs = []
         for idx, audio_clip in enumerate(audios):
             input_values = np.squeeze(
@@ -327,6 +349,8 @@ class OmniTrainingModule(pl.LightningModule):
             )
         # 这里将list合成batch tensor
         audio_embs = torch.stack(audio_embs, dim=0)  # [B, ...]
+        t_wav2vec_end = time.time()
+        print(f"[Timer] Wav2Vec音频特征提取耗时: {t_wav2vec_end - t_wav2vec_start:.3f} 秒")
             
         # TODO 构造图像条件image_emb，要check逻辑
         B, C, T, H, W = video_latents.shape
@@ -341,6 +365,8 @@ class OmniTrainingModule(pl.LightningModule):
         image_emb = {}
         image_emb['y'] = torch.cat([image_cat, msk], dim=1)  # [B, C+1, T, H, W]
 
+        # 计时：后处理与组装
+        t_post_start = time.time()
         # TODO 组装数据，放到目标设备上，这里不一定要放到cuda
         target_device = device  # 或 next(self.parameters()).device
         batch_inputs = {
@@ -351,6 +377,11 @@ class OmniTrainingModule(pl.LightningModule):
         }
         noise = torch.randn_like(video_latents).to(target_device)
         batch_inputs["noise"] = noise
-        
+        t_post_end = time.time()
         print(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
+        print(f"[Timer] 后处理与组装耗时: {t_post_end - t_post_start:.3f} 秒")
+
+        print(f"[Timer] forward_preprocess 总耗时: {time.time() - time_start:.3f} 秒")
+        print(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
+        
         return batch_inputs

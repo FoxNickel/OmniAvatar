@@ -1,8 +1,8 @@
 | Reloading config from: pretrained_models/OmniAvatar-1.3B/config.json
-{'config': 'configs/train_1.3B.yaml', 'exp_path': 'pretrained_models/OmniAvatar-1.3B', 'input_file': None, 'debug': True, 'infer': False, 'hparams': '', 'dtype': 'fp16', 'text_encoder_path': 'pretrained_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth', 'image_encoder_path': 'None', 'dit_path': 'pretrained_models/Wan2.1-T2V-1.3B/diffusion_pytorch_model.safetensors', 'vae_path': 'pretrained_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth', 'wav2vec_path': 'pretrained_models/wav2vec2-base-960h', 'num_persistent_param_in_dit': None, 'reload_cfg': True, 'sp_size': 1, 'seed': 42, 'image_sizes_720': [[400, 720], [720, 720], [720, 400]], 'image_sizes_1280': [[720, 720], [528, 960], [960, 528], [720, 1280], [1280, 720]], 'max_hw': 720, 'max_tokens': 30000, 'seq_len': 200, 'overlap_frame': 13, 'guidance_scale': 4.5, 'audio_scale': None, 'num_steps': 50, 'fps': 20, 'sample_rate': 16000, 'negative_prompt': 'Vivid color tones, background/camera moving quickly, screen switching, subtitles and special effects, mutation, overexposed, static, blurred details, subtitles, style, work, painting, image, still, overall grayish, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fingers merging, motionless image, chaotic background, three legs, crowded background with many people, walking backward', 'silence_duration_s': 0.3, 'use_fsdp': False, 'tea_cache_l1_thresh': 0, 'dataset_base_path': '/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1', 'name': 'train_1.3B', 'savedir': '/mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs', 'batch_size': 1, 'nodes': 1, 'devices': 1, 'num_train_epochs': 1, 'mode': 'train', 'checkpoint_path': '', 'lr': '1e-4', 'max_frames': 120, 'debug_data_len': 5, 'rank': 0, 'world_size': 1, 'local_rank': 0, 'device': 'cuda:0', 'num_nodes': 1, 'i2v': True, 'use_audio': True, 'random_prefix_frames': True, 'model_config': {'in_dim': 33}, 'lora_target_modules': 'q,k,v,o,ffn.0,ffn.2', 'init_lora_weights': 'kaiming', 'lora_rank': 128, 'lora_alpha': 64.0, 'use_gradient_checkpointing': True, 'use_gradient_checkpointing_offload': False, 'train_architecture': 'lora'}
-[2025-08-13 21:25:37,770] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cuda (auto detect)
-[2025-08-13 21:25:38,938] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
-[train_pl.py]-main-] config: {'dtype': 'fp16', 'text_encoder_path': 'pretrained_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth', 'image_encoder_path': 'None', 'dit_path': 'pretrained_models/Wan2.1-T2V-1.3B/diffusion_pytorch_model.safetensors', 'vae_path': 'pretrained_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth', 'wav2vec_path': 'pretrained_models/wav2vec2-base-960h', 'exp_path': 'pretrained_models/OmniAvatar-1.3B', 'num_persistent_param_in_dit': None, 'reload_cfg': True, 'sp_size': 1, 'seed': 42, 'image_sizes_720': [[400, 720], [720, 720], [720, 400]], 'image_sizes_1280': [[720, 720], [528, 960], [960, 528], [720, 1280], [1280, 720]], 'max_hw': 720, 'max_tokens': 30000, 'seq_len': 200, 'overlap_frame': 13, 'guidance_scale': 4.5, 'audio_scale': None, 'num_steps': 50, 'fps': 20, 'sample_rate': 16000, 'negative_prompt': 'Vivid color tones, background/camera moving quickly, screen switching, subtitles and special effects, mutation, overexposed, static, blurred details, subtitles, style, work, painting, image, still, overall grayish, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fingers merging, motionless image, chaotic background, three legs, crowded background with many people, walking backward', 'silence_duration_s': 0.3, 'use_fsdp': False, 'tea_cache_l1_thresh': 0, 'dataset_base_path': '/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1', 'name': 'train_1.3B', 'savedir': '/mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs', 'batch_size': 1, 'nodes': 1, 'devices': 1, 'num_train_epochs': 1, 'mode': 'train', 'checkpoint_path': '', 'lr': 0.0001, 'max_frames': 120, 'debug': True, 'debug_data_len': 5}
+{'config': 'configs/train_1.3B.yaml', 'exp_path': 'pretrained_models/OmniAvatar-1.3B', 'input_file': None, 'debug': False, 'infer': False, 'hparams': '', 'dtype': 'bf16', 'text_encoder_path': 'pretrained_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth', 'image_encoder_path': 'None', 'dit_path': 'pretrained_models/Wan2.1-T2V-1.3B/diffusion_pytorch_model.safetensors', 'vae_path': 'pretrained_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth', 'wav2vec_path': 'pretrained_models/wav2vec2-base-960h', 'num_persistent_param_in_dit': None, 'reload_cfg': True, 'sp_size': 1, 'seed': 42, 'image_sizes_720': [[400, 720], [720, 720], [720, 400]], 'image_sizes_1280': [[720, 720], [528, 960], [960, 528], [720, 1280], [1280, 720]], 'max_hw': 720, 'max_tokens': 30000, 'seq_len': 200, 'overlap_frame': 13, 'guidance_scale': 4.5, 'audio_scale': None, 'num_steps': 50, 'fps': 20, 'sample_rate': 16000, 'negative_prompt': 'Vivid color tones, background/camera moving quickly, screen switching, subtitles and special effects, mutation, overexposed, static, blurred details, subtitles, style, work, painting, image, still, overall grayish, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fingers merging, motionless image, chaotic background, three legs, crowded background with many people, walking backward', 'silence_duration_s': 0.3, 'use_fsdp': False, 'tea_cache_l1_thresh': 0, 'dataset_base_path': '/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1', 'name': 'train_1.3B', 'savedir': '/mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs', 'batch_size': 1, 'nodes': 1, 'devices': 1, 'num_train_epochs': 1, 'mode': 'train', 'checkpoint_path': '', 'lr': '1e-4', 'max_frames': 120, 'debug_data_len': 10, 'rank': 0, 'world_size': 1, 'local_rank': 0, 'device': 'cuda:0', 'num_nodes': 1, 'i2v': True, 'use_audio': True, 'random_prefix_frames': True, 'model_config': {'in_dim': 33}, 'lora_target_modules': 'q,k,v,o,ffn.0,ffn.2', 'init_lora_weights': 'kaiming', 'lora_rank': 128, 'lora_alpha': 64.0, 'use_gradient_checkpointing': True, 'use_gradient_checkpointing_offload': False, 'train_architecture': 'lora'}
+[2025-08-13 22:48:40,014] [INFO] [real_accelerator.py:260:get_accelerator] Setting ds_accelerator to cuda (auto detect)
+[2025-08-13 22:48:41,292] [INFO] [logging.py:107:log_dist] [Rank -1] [TorchCheckpointEngine] Initialized with serialization = False
+[train_pl.py]-main-] config: {'dtype': 'bf16', 'text_encoder_path': 'pretrained_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth', 'image_encoder_path': 'None', 'dit_path': 'pretrained_models/Wan2.1-T2V-1.3B/diffusion_pytorch_model.safetensors', 'vae_path': 'pretrained_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth', 'wav2vec_path': 'pretrained_models/wav2vec2-base-960h', 'exp_path': 'pretrained_models/OmniAvatar-1.3B', 'num_persistent_param_in_dit': None, 'reload_cfg': True, 'sp_size': 1, 'seed': 42, 'image_sizes_720': [[400, 720], [720, 720], [720, 400]], 'image_sizes_1280': [[720, 720], [528, 960], [960, 528], [720, 1280], [1280, 720]], 'max_hw': 720, 'max_tokens': 30000, 'seq_len': 200, 'overlap_frame': 13, 'guidance_scale': 4.5, 'audio_scale': None, 'num_steps': 50, 'fps': 20, 'sample_rate': 16000, 'negative_prompt': 'Vivid color tones, background/camera moving quickly, screen switching, subtitles and special effects, mutation, overexposed, static, blurred details, subtitles, style, work, painting, image, still, overall grayish, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fingers merging, motionless image, chaotic background, three legs, crowded background with many people, walking backward', 'silence_duration_s': 0.3, 'use_fsdp': False, 'tea_cache_l1_thresh': 0, 'dataset_base_path': '/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1', 'name': 'train_1.3B', 'savedir': '/mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs', 'batch_size': 1, 'nodes': 1, 'devices': 1, 'num_train_epochs': 1, 'mode': 'train', 'checkpoint_path': '', 'lr': 0.0001, 'max_frames': 120, 'debug': False, 'debug_data_len': 10}
 [OmniTrainingModule] __init__
 Loading models from: ['pretrained_models/Wan2.1-T2V-1.3B/diffusion_pytorch_model.safetensors']
     model_name: wan_video_dit model_class: WanModel
@@ -1857,7 +1857,7 @@ Using wan_video_dit from ['pretrained_models/Wan2.1-T2V-1.3B/diffusion_pytorch_m
 Using wan_video_vae from pretrained_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth.
 No wan_video_image_encoder models available.
 [OmniTrainingModule load_model] -> Use LoRA: lora rank: 128, lora alpha: 64.0, pretrained_lora_path: pretrained_models/OmniAvatar-1.3B/pytorch_model.pt
-[OmniTrainingModule add_lora_to_model] -> lora_config: LoraConfig(task_type=None, peft_type=<PeftType.LORA: 'LORA'>, auto_mapping=None, base_model_name_or_path=None, revision=None, inference_mode=False, r=128, target_modules={'o', 'ffn.0', 'k', 'ffn.2', 'v', 'q'}, exclude_modules=None, lora_alpha=64.0, lora_dropout=0.0, fan_in_fan_out=False, bias='none', use_rslora=False, modules_to_save=None, init_lora_weights=True, layers_to_transform=None, layers_pattern=None, rank_pattern={}, alpha_pattern={}, megatron_config=None, megatron_core='megatron.core', trainable_token_indices=None, loftq_config={}, eva_config=None, corda_config=None, use_dora=False, layer_replication=None, runtime_config=LoraRuntimeConfig(ephemeral_gpu_offload=False), lora_bias=False)
+[OmniTrainingModule add_lora_to_model] -> lora_config: LoraConfig(task_type=None, peft_type=<PeftType.LORA: 'LORA'>, auto_mapping=None, base_model_name_or_path=None, revision=None, inference_mode=False, r=128, target_modules={'ffn.2', 'k', 'ffn.0', 'v', 'o', 'q'}, exclude_modules=None, lora_alpha=64.0, lora_dropout=0.0, fan_in_fan_out=False, bias='none', use_rslora=False, modules_to_save=None, init_lora_weights=True, layers_to_transform=None, layers_pattern=None, rank_pattern={}, alpha_pattern={}, megatron_config=None, megatron_core='megatron.core', trainable_token_indices=None, loftq_config={}, eva_config=None, corda_config=None, use_dora=False, layer_replication=None, runtime_config=LoraRuntimeConfig(ephemeral_gpu_offload=False), lora_bias=False)
 [OmniTrainingModule add_lora_to_model] -> 634 parameters are loaded from pretrained_models/OmniAvatar-1.3B/pytorch_model.pt. 0 parameters are unexpected.
 [OmniTrainingModule __init__]: Model loaded on cpu, dtype: torch.float32
 ===================[train_pl.py]-main-] model summary================================
@@ -3966,162 +3966,38 @@ No wan_video_image_encoder models available.
 [OmniTrainingModule] - name: audio_encoder.encoder.layers.11.final_layer_norm.weight, requires_grad: True
 [OmniTrainingModule] - name: audio_encoder.encoder.layers.11.final_layer_norm.bias, requires_grad: True
 ===================================================================================
-[OmniTrainingModule]: start training with config: {'dtype': 'fp16', 'text_encoder_path': 'pretrained_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth', 'image_encoder_path': 'None', 'dit_path': 'pretrained_models/Wan2.1-T2V-1.3B/diffusion_pytorch_model.safetensors', 'vae_path': 'pretrained_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth', 'wav2vec_path': 'pretrained_models/wav2vec2-base-960h', 'exp_path': 'pretrained_models/OmniAvatar-1.3B', 'num_persistent_param_in_dit': None, 'reload_cfg': True, 'sp_size': 1, 'seed': 42, 'image_sizes_720': [[400, 720], [720, 720], [720, 400]], 'image_sizes_1280': [[720, 720], [528, 960], [960, 528], [720, 1280], [1280, 720]], 'max_hw': 720, 'max_tokens': 30000, 'seq_len': 200, 'overlap_frame': 13, 'guidance_scale': 4.5, 'audio_scale': None, 'num_steps': 50, 'fps': 20, 'sample_rate': 16000, 'negative_prompt': 'Vivid color tones, background/camera moving quickly, screen switching, subtitles and special effects, mutation, overexposed, static, blurred details, subtitles, style, work, painting, image, still, overall grayish, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fingers merging, motionless image, chaotic background, three legs, crowded background with many people, walking backward', 'silence_duration_s': 0.3, 'use_fsdp': False, 'tea_cache_l1_thresh': 0, 'dataset_base_path': '/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1', 'name': 'train_1.3B', 'savedir': '/mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs/train_1.3B', 'batch_size': 1, 'nodes': 1, 'devices': 1, 'num_train_epochs': 1, 'mode': 'train', 'checkpoint_path': '', 'lr': 0.0001, 'max_frames': 120, 'debug': True, 'debug_data_len': 5}
+[OmniTrainingModule]: start training with config: {'dtype': 'bf16', 'text_encoder_path': 'pretrained_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth', 'image_encoder_path': 'None', 'dit_path': 'pretrained_models/Wan2.1-T2V-1.3B/diffusion_pytorch_model.safetensors', 'vae_path': 'pretrained_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth', 'wav2vec_path': 'pretrained_models/wav2vec2-base-960h', 'exp_path': 'pretrained_models/OmniAvatar-1.3B', 'num_persistent_param_in_dit': None, 'reload_cfg': True, 'sp_size': 1, 'seed': 42, 'image_sizes_720': [[400, 720], [720, 720], [720, 400]], 'image_sizes_1280': [[720, 720], [528, 960], [960, 528], [720, 1280], [1280, 720]], 'max_hw': 720, 'max_tokens': 30000, 'seq_len': 200, 'overlap_frame': 13, 'guidance_scale': 4.5, 'audio_scale': None, 'num_steps': 50, 'fps': 20, 'sample_rate': 16000, 'negative_prompt': 'Vivid color tones, background/camera moving quickly, screen switching, subtitles and special effects, mutation, overexposed, static, blurred details, subtitles, style, work, painting, image, still, overall grayish, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fingers merging, motionless image, chaotic background, three legs, crowded background with many people, walking backward', 'silence_duration_s': 0.3, 'use_fsdp': False, 'tea_cache_l1_thresh': 0, 'dataset_base_path': '/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1', 'name': 'train_1.3B', 'savedir': '/mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs/train_1.3B', 'batch_size': 1, 'nodes': 1, 'devices': 1, 'num_train_epochs': 1, 'mode': 'train', 'checkpoint_path': '', 'lr': 0.0001, 'max_frames': 120, 'debug': False, 'debug_data_len': 10}
 [OmniTrainingModule] configure_optimizers
 [OmniTrainingModule] on_fit_start -> device: cuda:0, param device: cuda:0
-Training: |          | 0/? [00:00<?, ?it/s]Training:   0%|          | 0/5 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/5 [00:00<?, ?it/s] [OmniTrainingModule] training_step -> batch keys: dict_keys(['video_id', 'prompt', 'video_path', 'audio_path', 'first_frame_path']), batch_idx: 0, batch_size: 1
+Training: |          | 0/? [00:00<?, ?it/s]Training:   0%|          | 0/224174 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/224174 [00:00<?, ?it/s] [OmniTrainingModule] training_step -> batch keys: dict_keys(['video_id', 'prompt', 'video_path', 'audio_path', 'first_frame_path']), batch_idx: 0, batch_size: 1
 [OmniTrainingModule forward_preprocess] -> device: cuda:0
-[OmniTrainingModule forward_preprocess] -> Loading video: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/wHRxsU26o8U_173/video.mp4
-[OmniTrainingModule forward_preprocess] -> Original video fps: 25.0, rounded fps: 25
-[OmniTrainingModule forward_preprocess] -> Raw video shape: torch.Size([115, 360, 640, 3])
-[OmniTrainingModule forward_preprocess] -> Resized video shape: torch.Size([3, 115, 400, 640])
-[OmniTrainingModule forward_preprocess] -> Loading audio: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/wHRxsU26o8U_173/audio.wav
-[OmniTrainingModule forward_preprocess] -> Raw audio shape: (74304,), sr: 16000
-[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from 51 to 76
-[OmniTrainingModule forward_preprocess] -> L: 25, T: 7
-[OmniTrainingModule forward_preprocess] -> Final video_clip shape: torch.Size([3, 25, 400, 640])
-[OmniTrainingModule forward_preprocess] -> Final audio_clip shape: (16000,)
-[OmniTrainingModule forward_preprocess] -> All videos stacked shape: torch.Size([1, 3, 25, 400, 640]), videos device: cuda:0
-[WanVideoPipeline] encode_video -> input_video device: cuda:0, dtype: torch.float16
-[WanVideoVAE] encode: videos torch.Size([1, 3, 25, 400, 640]), device cuda:0, tiled True, tile_size (34, 34), tile_stride (18, 16)
-[OmniTrainingModule forward_preprocess] -> Latent shape: torch.Size([1, 16, 7, 50, 80])
-[OmniTrainingModule forward_preprocess] -> Audio embedding 0 shape: torch.Size([1, 25, 10752])
-[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: torch.Size([1, 16, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752]), noise shape: torch.Size([1, 16, 7, 50, 80])
-[WanVideoPipeline] training_loss -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise']), self.torch_dtype = torch.float16, self.device = cuda:0
-[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: 1000, len(timesteps): 100, timesteps: tensor([1000.0000,  997.9838,  995.9349,  993.8525,  991.7355,  989.5833,
-         987.3949,  985.1695,  982.9059,  980.6034,  978.2609,  975.8771,
-         973.4514,  970.9821,  968.4685,  965.9091,  963.3028,  960.6483,
-         957.9440,  955.1887,  952.3810,  949.5193,  946.6020,  943.6274,
-         940.5941,  937.5000,  934.3434,  931.1225,  927.8350,  924.4792,
-         921.0526,  917.5532,  913.9785,  910.3261,  906.5934,  902.7778,
-         898.8763,  894.8864,  890.8046,  886.6280,  882.3529,  877.9763,
-         873.4940,  868.9025,  864.1975,  859.3750,  854.4304,  849.3589,
-         844.1558,  838.8158,  833.3333,  827.7026,  821.9177,  815.9722,
-         809.8591,  803.5715,  797.1015,  790.4412,  783.5821,  776.5152,
-         769.2307,  761.7188,  753.9683,  745.9678,  737.7049,  729.1666,
-         720.3389,  711.2068,  701.7543,  691.9643,  681.8182,  671.2963,
-         660.3774,  649.0385,  637.2549,  625.0000,  612.2449,  598.9583,
-         585.1064,  570.6522,  555.5555,  539.7728,  523.2557,  505.9524,
-         487.8049,  468.7500,  448.7180,  427.6316,  405.4054,  381.9445,
-         357.1428,  330.8824,  303.0303,  273.4375,  241.9355,  208.3333,
-         172.4138,  133.9286,   92.5926,   48.0769])
-[WanVideoPipeline] model_fn -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise', 'latents'])
-[WanVideoPipeline] model_fn -> latents shape: torch.Size([1, 16, 7, 50, 80]), timestep: tensor([886.5000], device='cuda:0', dtype=torch.float16), audio_emb shape: torch.Size([1, 25, 10752]), prompt: ["a sequence of animated frames showing a character with large, expressive eyes and a simplistic design. The character appears to be a cartoonish creature with a pink and white color scheme. The character's eyes are large and black with white pupils, and it has a simple, friendly face. The character is initially seen peeking over a wooden fence, then it moves down a slide, and finally, it reaches the bottom of the slide. The background is a plain, light purple color, providing a clean and minimalistic setting for the character. The scene is set indoors, with no visible windows or external elements. The wooden fence at the top of the scene is the only object that adds texture and depth to the background. The main subject is a cartoonish character with large, expressive eyes and a simplistic design. The character has a pink and white color scheme, with a friendly and approachable appearance. The character's movements are smooth and deliberate. It starts by peeking over the wooden fence, then it moves down a slide, and finally, it reaches the bottom of the slide. The movement is slow and steady, with the character's head and body moving in a downward direction. The background remains static throughout the video, with no changes or movements."], image_emb keys: dict_keys(['y'])
-[WanVideoPipeline] model_fn -> run dit...
-[WanModel] Forward pass with x shape: torch.Size([1, 16, 7, 50, 80]), timestep: torch.Size([1]), context shape: torch.Size([1, 512, 4096]), y shape: torch.Size([1, 17, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752])
-[AudioPack forward] vid shape: torch.Size([1, 10752, 28, 1, 1]), t, h, w: 4, 1, 1
-[WanModel] x shape: torch.Size([1, 33, 7, 50, 80])
-[WanModel] After patch embedding, x shape: torch.Size([1, 1536, 7, 25, 40])
-[WanVideoPipeline] model_fn -> noise_pred_posi shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-[WanVideoPipeline] training_loss -> noise_pred shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0, training_target shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-Epoch 0:  20%|██        | 1/5 [00:16<01:07,  0.06it/s]Epoch 0:  20%|██        | 1/5 [00:16<01:07,  0.06it/s, v_num=12][OmniTrainingModule] training_step -> batch keys: dict_keys(['video_id', 'prompt', 'video_path', 'audio_path', 'first_frame_path']), batch_idx: 1, batch_size: 1
-[OmniTrainingModule forward_preprocess] -> device: cuda:0
-[OmniTrainingModule forward_preprocess] -> Loading video: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/InGaVPreV7Q_16/video.mp4
-[OmniTrainingModule forward_preprocess] -> Original video fps: 25.0, rounded fps: 25
-[OmniTrainingModule forward_preprocess] -> Raw video shape: torch.Size([197, 360, 640, 3])
-[OmniTrainingModule forward_preprocess] -> Resized video shape: torch.Size([3, 197, 400, 640])
-[OmniTrainingModule forward_preprocess] -> Loading audio: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/InGaVPreV7Q_16/audio.wav
-[OmniTrainingModule forward_preprocess] -> Raw audio shape: (126688,), sr: 16000
-[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from 52 to 77
-[OmniTrainingModule forward_preprocess] -> L: 25, T: 7
-[OmniTrainingModule forward_preprocess] -> Final video_clip shape: torch.Size([3, 25, 400, 640])
-[OmniTrainingModule forward_preprocess] -> Final audio_clip shape: (16000,)
-[OmniTrainingModule forward_preprocess] -> All videos stacked shape: torch.Size([1, 3, 25, 400, 640]), videos device: cuda:0
-[WanVideoPipeline] encode_video -> input_video device: cuda:0, dtype: torch.float16
-[WanVideoVAE] encode: videos torch.Size([1, 3, 25, 400, 640]), device cuda:0, tiled True, tile_size (34, 34), tile_stride (18, 16)
-[OmniTrainingModule forward_preprocess] -> Latent shape: torch.Size([1, 16, 7, 50, 80])
-[OmniTrainingModule forward_preprocess] -> Audio embedding 0 shape: torch.Size([1, 25, 10752])
-[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: torch.Size([1, 16, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752]), noise shape: torch.Size([1, 16, 7, 50, 80])
-[WanVideoPipeline] training_loss -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise']), self.torch_dtype = torch.float16, self.device = cuda:0
-[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: 1000, len(timesteps): 100, timesteps: tensor([1000.0000,  997.9838,  995.9349,  993.8525,  991.7355,  989.5833,
-         987.3949,  985.1695,  982.9059,  980.6034,  978.2609,  975.8771,
-         973.4514,  970.9821,  968.4685,  965.9091,  963.3028,  960.6483,
-         957.9440,  955.1887,  952.3810,  949.5193,  946.6020,  943.6274,
-         940.5941,  937.5000,  934.3434,  931.1225,  927.8350,  924.4792,
-         921.0526,  917.5532,  913.9785,  910.3261,  906.5934,  902.7778,
-         898.8763,  894.8864,  890.8046,  886.6280,  882.3529,  877.9763,
-         873.4940,  868.9025,  864.1975,  859.3750,  854.4304,  849.3589,
-         844.1558,  838.8158,  833.3333,  827.7026,  821.9177,  815.9722,
-         809.8591,  803.5715,  797.1015,  790.4412,  783.5821,  776.5152,
-         769.2307,  761.7188,  753.9683,  745.9678,  737.7049,  729.1666,
-         720.3389,  711.2068,  701.7543,  691.9643,  681.8182,  671.2963,
-         660.3774,  649.0385,  637.2549,  625.0000,  612.2449,  598.9583,
-         585.1064,  570.6522,  555.5555,  539.7728,  523.2557,  505.9524,
-         487.8049,  468.7500,  448.7180,  427.6316,  405.4054,  381.9445,
-         357.1428,  330.8824,  303.0303,  273.4375,  241.9355,  208.3333,
-         172.4138,  133.9286,   92.5926,   48.0769])
-[WanVideoPipeline] model_fn -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise', 'latents'])
-[WanVideoPipeline] model_fn -> latents shape: torch.Size([1, 16, 7, 50, 80]), timestep: tensor([720.5000], device='cuda:0', dtype=torch.float16), audio_emb shape: torch.Size([1, 25, 10752]), prompt: ["a cartoonish red character with large, expressive eyes and glasses, peeking out from behind a clock. The character is positioned on the left side of the clock face, which is white with black numbers and hands. The background is a solid blue, providing a contrasting backdrop to the vibrant red character. The character's eyes move slightly as it looks around, creating a playful and engaging scene. The main subject is a red character with large, round eyes and glasses. The character is positioned on the left side of the clock face, partially obscured by the clock's edge. The character's eyes move slightly, giving the impression of curiosity or surprise. The character remains stationary in terms of its position on the clock, but its eyes move slightly, indicating subtle movements. The background is a solid blue color, providing a clean and simple backdrop that contrasts with the vibrant red character. There are no additional objects or elements in the background, keeping the focus on the character and the clock. The camera is stationary, focusing on a close-up view of the clock and the character. The angle is slightly tilted, providing a clear view of the character's face and the clock's face."], image_emb keys: dict_keys(['y'])
-[WanVideoPipeline] model_fn -> run dit...
-[WanModel] Forward pass with x shape: torch.Size([1, 16, 7, 50, 80]), timestep: torch.Size([1]), context shape: torch.Size([1, 512, 4096]), y shape: torch.Size([1, 17, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752])
-[AudioPack forward] vid shape: torch.Size([1, 10752, 28, 1, 1]), t, h, w: 4, 1, 1
-[WanModel] x shape: torch.Size([1, 33, 7, 50, 80])
-[WanModel] After patch embedding, x shape: torch.Size([1, 1536, 7, 25, 40])
-[WanVideoPipeline] model_fn -> noise_pred_posi shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-[WanVideoPipeline] training_loss -> noise_pred shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0, training_target shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-Epoch 0:  40%|████      | 2/5 [00:32<00:48,  0.06it/s, v_num=12]Epoch 0:  40%|████      | 2/5 [00:32<00:48,  0.06it/s, v_num=12][OmniTrainingModule] training_step -> batch keys: dict_keys(['video_id', 'prompt', 'video_path', 'audio_path', 'first_frame_path']), batch_idx: 2, batch_size: 1
-[OmniTrainingModule forward_preprocess] -> device: cuda:0
-[OmniTrainingModule forward_preprocess] -> Loading video: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/9qO7s-kXfEk_39/video.mp4
-[OmniTrainingModule forward_preprocess] -> Original video fps: 24.0, rounded fps: 24
-[OmniTrainingModule forward_preprocess] -> Raw video shape: torch.Size([729, 360, 640, 3])
-[OmniTrainingModule forward_preprocess] -> Resized video shape: torch.Size([3, 729, 400, 640])
-[OmniTrainingModule forward_preprocess] -> Loading audio: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/9qO7s-kXfEk_39/audio.wav
-[OmniTrainingModule forward_preprocess] -> Raw audio shape: (485947,), sr: 16000
-[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from 681 to 706
-[OmniTrainingModule forward_preprocess] -> L: 25, T: 7
-[OmniTrainingModule forward_preprocess] -> Final video_clip shape: torch.Size([3, 25, 400, 640])
-[OmniTrainingModule forward_preprocess] -> Final audio_clip shape: (16650,)
-[OmniTrainingModule forward_preprocess] -> All videos stacked shape: torch.Size([1, 3, 25, 400, 640]), videos device: cuda:0
-[WanVideoPipeline] encode_video -> input_video device: cuda:0, dtype: torch.float16
-[WanVideoVAE] encode: videos torch.Size([1, 3, 25, 400, 640]), device cuda:0, tiled True, tile_size (34, 34), tile_stride (18, 16)
-[OmniTrainingModule forward_preprocess] -> Latent shape: torch.Size([1, 16, 7, 50, 80])
-[OmniTrainingModule forward_preprocess] -> Audio embedding 0 shape: torch.Size([1, 25, 10752])
-[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: torch.Size([1, 16, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752]), noise shape: torch.Size([1, 16, 7, 50, 80])
-[WanVideoPipeline] training_loss -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise']), self.torch_dtype = torch.float16, self.device = cuda:0
-[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: 1000, len(timesteps): 100, timesteps: tensor([1000.0000,  997.9838,  995.9349,  993.8525,  991.7355,  989.5833,
-         987.3949,  985.1695,  982.9059,  980.6034,  978.2609,  975.8771,
-         973.4514,  970.9821,  968.4685,  965.9091,  963.3028,  960.6483,
-         957.9440,  955.1887,  952.3810,  949.5193,  946.6020,  943.6274,
-         940.5941,  937.5000,  934.3434,  931.1225,  927.8350,  924.4792,
-         921.0526,  917.5532,  913.9785,  910.3261,  906.5934,  902.7778,
-         898.8763,  894.8864,  890.8046,  886.6280,  882.3529,  877.9763,
-         873.4940,  868.9025,  864.1975,  859.3750,  854.4304,  849.3589,
-         844.1558,  838.8158,  833.3333,  827.7026,  821.9177,  815.9722,
-         809.8591,  803.5715,  797.1015,  790.4412,  783.5821,  776.5152,
-         769.2307,  761.7188,  753.9683,  745.9678,  737.7049,  729.1666,
-         720.3389,  711.2068,  701.7543,  691.9643,  681.8182,  671.2963,
-         660.3774,  649.0385,  637.2549,  625.0000,  612.2449,  598.9583,
-         585.1064,  570.6522,  555.5555,  539.7728,  523.2557,  505.9524,
-         487.8049,  468.7500,  448.7180,  427.6316,  405.4054,  381.9445,
-         357.1428,  330.8824,  303.0303,  273.4375,  241.9355,  208.3333,
-         172.4138,  133.9286,   92.5926,   48.0769])
-[WanVideoPipeline] model_fn -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise', 'latents'])
-[WanVideoPipeline] model_fn -> latents shape: torch.Size([1, 16, 7, 50, 80]), timestep: tensor([660.5000], device='cuda:0', dtype=torch.float16), audio_emb shape: torch.Size([1, 25, 10752]), prompt: ["two animated characters, a green-shirted character and a blue-shirted character, standing next to each other. The green-shirted character is holding a bottle of red liquid, which appears to be a beverage, while the blue-shirted character is holding a bottle of green liquid, also a beverage. The green-shirted character is initially looking downward with a sad expression, while the blue-shirted character is looking at the green-shirted character with a neutral expression. The scene takes place in a dimly lit environment with a staircase in the background. The green-shirted character's expression changes from sad to a more neutral look as the video progresses. The blue-shirted character remains relatively still, holding the green bottle. The background consists of a dimly lit environment with a staircase leading upwards. The staircase has a wooden texture and is partially visible. The background is mostly dark, with a red-colored wall or curtain visible in the distance, adding a sense of depth to the scene. The main subjects are two animated characters. The green-shirted character is holding a bottle of red liquid, which appears to be a beverage, and is initially looking downward with a sad expression. The blue-shirted character is holding a bottle of green liquid, also a beverage, and is looking at the green-shirted character with a neutral expression. The green-shirted character's position remains relatively static, while the blue-shirted character's position shifts slightly as they hold the green bottle. The camera is stationary, providing a medium shot of the two characters from the waist up, capturing their expressions and interactions clearly."], image_emb keys: dict_keys(['y'])
-[WanVideoPipeline] model_fn -> run dit...
-[WanModel] Forward pass with x shape: torch.Size([1, 16, 7, 50, 80]), timestep: torch.Size([1]), context shape: torch.Size([1, 512, 4096]), y shape: torch.Size([1, 17, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752])
-[AudioPack forward] vid shape: torch.Size([1, 10752, 28, 1, 1]), t, h, w: 4, 1, 1
-[WanModel] x shape: torch.Size([1, 33, 7, 50, 80])
-[WanModel] After patch embedding, x shape: torch.Size([1, 1536, 7, 25, 40])
-[WanVideoPipeline] model_fn -> noise_pred_posi shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-[WanVideoPipeline] training_loss -> noise_pred shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0, training_target shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-Epoch 0:  60%|██████    | 3/5 [01:19<00:52,  0.04it/s, v_num=12]Epoch 0:  60%|██████    | 3/5 [01:19<00:52,  0.04it/s, v_num=12][OmniTrainingModule] training_step -> batch keys: dict_keys(['video_id', 'prompt', 'video_path', 'audio_path', 'first_frame_path']), batch_idx: 3, batch_size: 1
-[OmniTrainingModule forward_preprocess] -> device: cuda:0
-[OmniTrainingModule forward_preprocess] -> Loading video: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/xUjy1uCHTyU_15/video.mp4
-[OmniTrainingModule forward_preprocess] -> Original video fps: 30.0, rounded fps: 30
-[OmniTrainingModule forward_preprocess] -> Raw video shape: torch.Size([199, 360, 640, 3])
-[OmniTrainingModule forward_preprocess] -> Resized video shape: torch.Size([3, 199, 400, 640])
-[OmniTrainingModule forward_preprocess] -> Loading audio: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/xUjy1uCHTyU_15/audio.wav
-[OmniTrainingModule forward_preprocess] -> Raw audio shape: (106626,), sr: 16000
-[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from 131 to 156
+[OmniTrainingModule forward_preprocess] -> Loading video: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_3_sv/2cweg_CwZhA_0/video.mp4
+[Timer] 视频读取耗时: 1.133 秒
+[OmniTrainingModule forward_preprocess] -> Original video fps: 29.97002997002997, rounded fps: 30
+[OmniTrainingModule forward_preprocess] -> Raw video shape: torch.Size([367, 360, 640, 3])
+[OmniTrainingModule forward_preprocess] -> Resized video shape: torch.Size([3, 367, 400, 640])
+[OmniTrainingModule forward_preprocess] -> Loading audio: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_3_sv/2cweg_CwZhA_0/audio.wav
+[Timer] 音频读取耗时: 1.071 秒
+[OmniTrainingModule forward_preprocess] -> Raw audio shape: (196534,), sr: 16000
+[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from 102 to 127
 [OmniTrainingModule forward_preprocess] -> L: 25, T: 7
 [OmniTrainingModule forward_preprocess] -> Final video_clip shape: torch.Size([3, 25, 400, 640])
 [OmniTrainingModule forward_preprocess] -> Final audio_clip shape: (13325,)
+[Timer] 数据预处理耗时: 2.664 秒
 [OmniTrainingModule forward_preprocess] -> All videos stacked shape: torch.Size([1, 3, 25, 400, 640]), videos device: cuda:0
-[WanVideoPipeline] encode_video -> input_video device: cuda:0, dtype: torch.float16
+[WanVideoPipeline] encode_video -> input_video device: cuda:0, dtype: torch.bfloat16
 [WanVideoVAE] encode: videos torch.Size([1, 3, 25, 400, 640]), device cuda:0, tiled True, tile_size (34, 34), tile_stride (18, 16)
 [OmniTrainingModule forward_preprocess] -> Latent shape: torch.Size([1, 16, 7, 50, 80])
+[Timer] VAE编码耗时: 5.775 秒
 [OmniTrainingModule forward_preprocess] -> Audio embedding 0 shape: torch.Size([1, 25, 10752])
+[Timer] Wav2Vec音频特征提取耗时: 0.385 秒
 [OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: torch.Size([1, 16, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752]), noise shape: torch.Size([1, 16, 7, 50, 80])
+[Timer] 后处理与组装耗时: 0.018 秒
+[Timer] forward_preprocess 总耗时: 8.886 秒
+[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: torch.Size([1, 16, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752]), noise shape: torch.Size([1, 16, 7, 50, 80])
+[Check] input_latents: nan=False, inf=False, shape=torch.Size([1, 16, 7, 50, 80])
+[Check] audio_emb: nan=False, inf=False, shape=torch.Size([1, 25, 10752])
+[Check] noise: nan=False, inf=False, shape=torch.Size([1, 16, 7, 50, 80])
 [WanVideoPipeline] training_loss -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise']), self.torch_dtype = torch.float16, self.device = cuda:0
 [WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: 1000, len(timesteps): 100, timesteps: tensor([1000.0000,  997.9838,  995.9349,  993.8525,  991.7355,  989.5833,
          987.3949,  985.1695,  982.9059,  980.6034,  978.2609,  975.8771,
@@ -4141,57 +4017,6 @@ No wan_video_image_encoder models available.
          357.1428,  330.8824,  303.0303,  273.4375,  241.9355,  208.3333,
          172.4138,  133.9286,   92.5926,   48.0769])
 [WanVideoPipeline] model_fn -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise', 'latents'])
-[WanVideoPipeline] model_fn -> latents shape: torch.Size([1, 16, 7, 50, 80]), timestep: tensor([949.5000], device='cuda:0', dtype=torch.float16), audio_emb shape: torch.Size([1, 25, 10752]), prompt: ["two animated characters, a woman and a man, dancing on a beach at sunset. The woman wears a red dress with a flowing skirt and black boots, while the man wears a white shirt with a black vest and white pants. They dance energetically, moving in sync with each other, and their movements are fluid and expressive. The background features a vibrant orange and pink sunset over a calm ocean, with palm trees visible in the distance. The main subjects are the two animated characters. The woman has pink hair with a red headband, wears a red dress with a flowing skirt, and black boots. The man has white hair, wears a white shirt with a black vest and white pants. They are positioned side by side, facing each other, and their movements are synchronized as they dance. The woman's dress flows with her movements, and her hair moves with the breeze. The man's movements are equally expressive, with his arms and legs moving in rhythm. The camera remains stationary, capturing the entire scene from a fixed viewpoint, focusing on the two characters as they dance."], image_emb keys: dict_keys(['y'])
+[WanVideoPipeline] model_fn -> latents shape: torch.Size([1, 16, 7, 50, 80]), timestep: tensor([886.5000], device='cuda:0', dtype=torch.float16), audio_emb shape: torch.Size([1, 25, 10752]), prompt: ["A person with long, wavy, auburn hair is engaging in various actions in a room with a colorful wallpaper featuring anime-style characters. The individual is wearing a white, lace-trimmed top and white shorts. They are initially seen with their mouth open, possibly in mid-conversation or reacting to something. The person then leans forward, placing their hands on the back of a gray chair, and appears to be either sitting down or preparing to sit. Subsequently, they are seen holding a black object, possibly a remote control, and seem to be interacting with it, possibly adjusting settings or preparing to use it. The setting suggests a casual, possibly domestic environment with a focus on the individual's actions and movements."], image_emb keys: dict_keys(['y'])
 [WanVideoPipeline] model_fn -> run dit...
 [WanModel] Forward pass with x shape: torch.Size([1, 16, 7, 50, 80]), timestep: torch.Size([1]), context shape: torch.Size([1, 512, 4096]), y shape: torch.Size([1, 17, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752])
-[AudioPack forward] vid shape: torch.Size([1, 10752, 28, 1, 1]), t, h, w: 4, 1, 1
-[WanModel] x shape: torch.Size([1, 33, 7, 50, 80])
-[WanModel] After patch embedding, x shape: torch.Size([1, 1536, 7, 25, 40])
-[WanVideoPipeline] model_fn -> noise_pred_posi shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-[WanVideoPipeline] training_loss -> noise_pred shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0, training_target shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-Epoch 0:  80%|████████  | 4/5 [01:35<00:23,  0.04it/s, v_num=12]Epoch 0:  80%|████████  | 4/5 [01:35<00:23,  0.04it/s, v_num=12][OmniTrainingModule] training_step -> batch keys: dict_keys(['video_id', 'prompt', 'video_path', 'audio_path', 'first_frame_path']), batch_idx: 4, batch_size: 1
-[OmniTrainingModule forward_preprocess] -> device: cuda:0
-[OmniTrainingModule forward_preprocess] -> Loading video: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/V8buho2fX8g_33/video.mp4
-[OmniTrainingModule forward_preprocess] -> Original video fps: 23.976023976023978, rounded fps: 24
-[OmniTrainingModule forward_preprocess] -> Raw video shape: torch.Size([1569, 360, 640, 3])
-[OmniTrainingModule forward_preprocess] -> Resized video shape: torch.Size([3, 1569, 400, 640])
-[OmniTrainingModule forward_preprocess] -> Loading audio: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/V8buho2fX8g_33/audio.wav
-[OmniTrainingModule forward_preprocess] -> Raw audio shape: (1046941,), sr: 16000
-[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from 205 to 230
-[OmniTrainingModule forward_preprocess] -> L: 25, T: 7
-[OmniTrainingModule forward_preprocess] -> Final video_clip shape: torch.Size([3, 25, 400, 640])
-[OmniTrainingModule forward_preprocess] -> Final audio_clip shape: (16650,)
-[OmniTrainingModule forward_preprocess] -> All videos stacked shape: torch.Size([1, 3, 25, 400, 640]), videos device: cuda:0
-[WanVideoPipeline] encode_video -> input_video device: cuda:0, dtype: torch.float16
-[WanVideoVAE] encode: videos torch.Size([1, 3, 25, 400, 640]), device cuda:0, tiled True, tile_size (34, 34), tile_stride (18, 16)
-[OmniTrainingModule forward_preprocess] -> Latent shape: torch.Size([1, 16, 7, 50, 80])
-[OmniTrainingModule forward_preprocess] -> Audio embedding 0 shape: torch.Size([1, 25, 10752])
-[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: torch.Size([1, 16, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752]), noise shape: torch.Size([1, 16, 7, 50, 80])
-[WanVideoPipeline] training_loss -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise']), self.torch_dtype = torch.float16, self.device = cuda:0
-[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: 1000, len(timesteps): 100, timesteps: tensor([1000.0000,  997.9838,  995.9349,  993.8525,  991.7355,  989.5833,
-         987.3949,  985.1695,  982.9059,  980.6034,  978.2609,  975.8771,
-         973.4514,  970.9821,  968.4685,  965.9091,  963.3028,  960.6483,
-         957.9440,  955.1887,  952.3810,  949.5193,  946.6020,  943.6274,
-         940.5941,  937.5000,  934.3434,  931.1225,  927.8350,  924.4792,
-         921.0526,  917.5532,  913.9785,  910.3261,  906.5934,  902.7778,
-         898.8763,  894.8864,  890.8046,  886.6280,  882.3529,  877.9763,
-         873.4940,  868.9025,  864.1975,  859.3750,  854.4304,  849.3589,
-         844.1558,  838.8158,  833.3333,  827.7026,  821.9177,  815.9722,
-         809.8591,  803.5715,  797.1015,  790.4412,  783.5821,  776.5152,
-         769.2307,  761.7188,  753.9683,  745.9678,  737.7049,  729.1666,
-         720.3389,  711.2068,  701.7543,  691.9643,  681.8182,  671.2963,
-         660.3774,  649.0385,  637.2549,  625.0000,  612.2449,  598.9583,
-         585.1064,  570.6522,  555.5555,  539.7728,  523.2557,  505.9524,
-         487.8049,  468.7500,  448.7180,  427.6316,  405.4054,  381.9445,
-         357.1428,  330.8824,  303.0303,  273.4375,  241.9355,  208.3333,
-         172.4138,  133.9286,   92.5926,   48.0769])
-[WanVideoPipeline] model_fn -> input keys: dict_keys(['input_latents', 'image_emb', 'prompt', 'audio_emb', 'noise', 'latents'])
-[WanVideoPipeline] model_fn -> latents shape: torch.Size([1, 16, 7, 50, 80]), timestep: tensor([921.], device='cuda:0', dtype=torch.float16), audio_emb shape: torch.Size([1, 25, 10752]), prompt: ["a cartoon character, a man with a mustache and a blue suit, sitting at a desk in front of a computer screen. He appears to be working or presenting, with various expressions and gestures indicating different emotions and actions. The background includes a large screen displaying a grid of blue and green lines, suggesting a digital or scientific theme. The character's movements are subtle and include shifting his gaze, changing his facial expressions, and occasionally gesturing with his hands. The background remains static, with the grid of lines on the screen providing a consistent visual element throughout the video. The movements are slow and deliberate, emphasizing the character's thoughtful and focused demeanor. The main subject is a cartoon man with a mustache, wearing a blue suit and a red tie. He is positioned at a desk, facing the camera, and interacts with a computer screen in front of him. His expressions change from neutral to concerned, and he occasionally gestures with his hands. The character remains seated throughout the video, with his movements limited to his facial expressions and hand gestures. The camera is stationary, providing a consistent frontal view of the character at the desk. The view is at eye level, focusing on the character's upper body and face."], image_emb keys: dict_keys(['y'])
-[WanVideoPipeline] model_fn -> run dit...
-[WanModel] Forward pass with x shape: torch.Size([1, 16, 7, 50, 80]), timestep: torch.Size([1]), context shape: torch.Size([1, 512, 4096]), y shape: torch.Size([1, 17, 7, 50, 80]), audio_emb shape: torch.Size([1, 25, 10752])
-[AudioPack forward] vid shape: torch.Size([1, 10752, 28, 1, 1]), t, h, w: 4, 1, 1
-[WanModel] x shape: torch.Size([1, 33, 7, 50, 80])
-[WanModel] After patch embedding, x shape: torch.Size([1, 1536, 7, 25, 40])
-[WanVideoPipeline] model_fn -> noise_pred_posi shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-[WanVideoPipeline] training_loss -> noise_pred shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0, training_target shape: torch.Size([1, 16, 7, 50, 80]), dtype: torch.float16, device: cuda:0
-Epoch 0: 100%|██████████| 5/5 [03:11<00:00,  0.03it/s, v_num=12]Epoch 0: 100%|██████████| 5/5 [03:11<00:00,  0.03it/s, v_num=12]Epoch 0: 100%|██████████| 5/5 [03:11<00:00,  0.03it/s, v_num=12]Epoch 0: 100%|██████████| 5/5 [03:11<00:00,  0.03it/s, v_num=12]

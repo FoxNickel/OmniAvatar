@@ -69,11 +69,11 @@ def main():
         devices=args.devices,
         # gradient_clip_val         =     config.max_grad_norm,
         log_every_n_steps=1,
-        precision=16,
+        precision=args.dtype,
         max_epochs=config.num_train_epochs,
         strategy=strategy,
         sync_batchnorm=True,
-        val_check_interval=5, # TODO 后面要改回来100
+        val_check_interval=5 if args.debug else 100, # TODO 后面要改回来100
         # check_val_every_n_epoch   =     5,
     )
     # config.model.params.global_rank = trainer.global_rank
