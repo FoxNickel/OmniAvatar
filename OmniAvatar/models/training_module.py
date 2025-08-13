@@ -45,6 +45,7 @@ class OmniTrainingModule(pl.LightningModule):
             self.audio_encoder = Wav2VecModel.from_pretrained(
                 args.wav2vec_path, local_files_only=True
             ).to(device=self.device)
+            self.audio_encoder.train()
             self.audio_encoder.feature_extractor._freeze_parameters()
 
     def load_model(self):
@@ -191,7 +192,7 @@ class OmniTrainingModule(pl.LightningModule):
         args = self.args
         device = self.device
         print(f"[OmniTrainingModule forward_preprocess] -> device: {device}")
-        max_frame = 10
+        max_frame = 25
         max_frame = max_frame // 4 * 4 + 1 if max_frame % 4 != 0 else max_frame - 3  # 对齐inference的调整
         # TODO 这里360经过vae之后，会变成360/8=45，然后进到模型之后，经过3d卷积的时候，会变成22，导致最后输出的时候跟原图h不一致。
         # 而inference的时候，h是400，是没问题的。这里要怎么处理？把原视频resize到400x640？还是说后面处理的时候补一下？
@@ -237,7 +238,7 @@ class OmniTrainingModule(pl.LightningModule):
                 f"[OmniTrainingModule forward_preprocess] -> Resized video shape: {video.shape}"
             )
 
-            L = video.shape[1]
+            origin_video_len = video.shape[1]
 
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Loading audio: {audio_paths[i]}"
@@ -249,14 +250,14 @@ class OmniTrainingModule(pl.LightningModule):
             samples_per_frame = int(args.sample_rate / video_fps)
 
             # TODO 短于max的直接丢，不能扩展，扩展会让模型学错东西
-            if L <= max_frame:
-                video_clip = video[:, :L]
-                audio_clip = audio[: L * samples_per_frame]
+            if origin_video_len <= max_frame:
+                video_clip = video[:, :origin_video_len]
+                audio_clip = audio[: origin_video_len * samples_per_frame]
                 print(
                     f"[OmniTrainingModule forward_preprocess] -> Video shorter than max_frame, use first {T} frames"
                 )
             else:
-                start_idx = np.random.randint(0, L - max_frame + 1)
+                start_idx = np.random.randint(0, origin_video_len - max_frame + 1)
                 video_clip = video[:, start_idx : start_idx + max_frame]
                 audio_clip = audio[
                     start_idx
@@ -267,19 +268,9 @@ class OmniTrainingModule(pl.LightningModule):
                     f"[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from {start_idx} to {start_idx + max_frame}"
                 )
 
-            L_clip = video_clip.shape[1]
-            T = (L_clip + 3) // 4
-            target_len = L * 4
-            print(f"[OmniTrainingModule forward_preprocess] -> L_clip: {L_clip}, T: {T}, target_len: {target_len}")
-            # if L_clip < target_len:
-            #     print(
-            #         f"[OmniTrainingModule forward_preprocess] -> Padding video from {L_clip} to {target_len} frames"
-            #     )
-            #     video_clip = F.pad(video_clip, (0, 0, 0, 0, 0, target_len - L_clip))
-            #     audio_clip = np.pad(
-            #         audio_clip, (0, (target_len - L_clip) * samples_per_frame)
-            #     )
-
+            L = video_clip.shape[1] # 这个L应该是=max_frame
+            T = (L + 3) // 4
+            print(f"[OmniTrainingModule forward_preprocess] -> L: {L}, T: {T}")
             print(
                 f"[OmniTrainingModule forward_preprocess] -> Final video_clip shape: {video_clip.shape}"
             )

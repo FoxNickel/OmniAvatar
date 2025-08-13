@@ -73,7 +73,7 @@ def main():
         max_epochs=config.num_train_epochs,
         strategy=strategy,
         sync_batchnorm=True,
-        val_check_interval=100,
+        val_check_interval=5, # TODO 后面要改回来100
         # check_val_every_n_epoch   =     5,
     )
     # config.model.params.global_rank = trainer.global_rank
@@ -96,19 +96,13 @@ def main():
     trainer_model = OmniTrainingModule(args)
 
     # 设置可训练的模块
-    trainer_model.freeze_except(["dit","audio_encoder"])
+    trainer_model.freeze_except(["lora", "audio_encoder"])
 
-    # TODO 这里不要吧？
+    print(f"===================[train_pl.py]-main-] model summary================================")
     for name, p in trainer_model.named_parameters():
         print(f"[OmniTrainingModule] - name: {name}, requires_grad: {p.requires_grad}")
-        # if "inject" in name and not "P" in name and "to_out" in name:
-        #     obj = get_nested_attr(trainer_model, name)
-        #     obj.data.zero_()
-        # if "tmp" in name:
-        #     # print(name)
-        #     obj = get_nested_attr(trainer_model, name)
-        #     obj.data.zero_()
-
+    print("===================================================================================")
+    
     if args.mode == "train":
         print(f"[OmniTrainingModule]: start training with config: {config}")
         trainer.fit(
