@@ -412,9 +412,11 @@ class WanModel(torch.nn.Module):
 
         # 5. 拼接图片条件（如mask），做patch embedding
         # 训练时，x 是视频的 latent，y 是图片条件（如图片 latent + mask），拼接后送入 patch embedding 和 patchify
-        x = torch.cat([x, y], dim=1)  # 拼接图片条件
-        x = self.patch_embedding(x)   # 3D卷积分块升维
-        x, (f, h, w) = self.patchify(x)  # 展平成patch序列
+        x = torch.cat([x, y], dim=1)  # 拼接图片条件, x=[1,33,3,45,80]
+        print(f"[WanModel] x shape: {x.shape}")
+        x = self.patch_embedding(x)   # 3D卷积分块升维x=[1,1536,3,22,40], 应该就是这变成22了，应该是45才对
+        print(f"[WanModel] After patch embedding, x shape: {x.shape}")
+        x, (f, h, w) = self.patchify(x)  # 展平成patch序列x=[1,2640,1536], (f,h,w)=(3,22,40)
 
         # 6. 计算RoPE三维位置编码
         freqs = torch.cat([
@@ -491,14 +493,14 @@ class WanModel(torch.nn.Module):
                 tea_cache.store(x_cache)
 
         # 13. 输出头部还原patch
-        x = self.head(x, t)
+        x = self.head(x, t) # x=[1,2640,64]
         if args.sp_size > 1:
             # Context Parallel
             x = get_sp_group().all_gather(x, dim=1) # TODO: the size should be devided by sp_size
             x = x[:, :ori_x_len]
 
         # 14. unpatchify还原为视频帧格式
-        x = self.unpatchify(x, (f, h, w))
+        x = self.unpatchify(x, (f, h, w)) # x=[1,16,3,44,80], (f,h,w)=(3,22,40) unpatch出来就是44了，H少了1
         return x
 
     @staticmethod

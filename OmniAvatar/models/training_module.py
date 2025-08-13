@@ -193,7 +193,10 @@ class OmniTrainingModule(pl.LightningModule):
         print(f"[OmniTrainingModule forward_preprocess] -> device: {device}")
         max_frame = 10
         max_frame = max_frame // 4 * 4 + 1 if max_frame % 4 != 0 else max_frame - 3  # 对齐inference的调整
-        target_w, target_h = 640, 360
+        # TODO 这里360经过vae之后，会变成360/8=45，然后进到模型之后，经过3d卷积的时候，会变成22，导致最后输出的时候跟原图h不一致。
+        # 而inference的时候，h是400，是没问题的。这里要怎么处理？把原视频resize到400x640？还是说后面处理的时候补一下？
+        # 先按resize到400来了
+        target_w, target_h = 640, 400
 
         video_paths = batch["video_path"]
         audio_paths = batch["audio_path"]
@@ -305,11 +308,13 @@ class OmniTrainingModule(pl.LightningModule):
 
         self.pipe.load_models_to_device(["vae"])
         with torch.no_grad():
+            # videos=[1, 3, 9, 360, 640]
             video_latents = self.pipe.encode_video(
                 videos.to(
                     device=device, dtype=next(self.parameters()).dtype
                 )  # trainer是fp16，但这里是32，要转一下，取参数类型即可
             )  # [B, latent_dim, T, H', W']
+            # video_latents=[1, 16, 3, 45, 80]
         print(
             f"[OmniTrainingModule forward_preprocess] -> Latent shape: {video_latents.shape}"
         )
