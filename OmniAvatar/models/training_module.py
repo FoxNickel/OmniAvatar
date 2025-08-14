@@ -1,13 +1,7 @@
 import os
-import numpy as np
 import torch
-import librosa
 import time
-import torchvision
-import torchvision.transforms as TT
 import pytorch_lightning as pl
-import torch.nn.functional as F
-from transformers import Wav2Vec2FeatureExtractor
 from peft import LoraConfig, inject_adapter_in_model
 
 from OmniAvatar.models.model_manager import ModelManager
@@ -30,9 +24,6 @@ class OmniTrainingModule(pl.LightningModule):
 
         # 加载音频模型Wav2Vec
         from OmniAvatar.models.wav2vec import Wav2VecModel
-        self.wav_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
-            args.wav2vec_path
-        )
         self.audio_encoder = Wav2VecModel.from_pretrained(
             args.wav2vec_path, local_files_only=True
         ).to(device=self.device)
@@ -132,7 +123,7 @@ class OmniTrainingModule(pl.LightningModule):
     def on_fit_start(self):
         # 模型初始化的时候，device是cpu，等到fit开始的时候，Lightning会自动分配设备
         print(f"[OmniTrainingModule] on_fit_start -> device: {self.device}, param device: {next(self.parameters()).device}")
-        self.pipe.device = next(self.parameters()).device
+        self.pipe.device = self.device
     
     def configure_optimizers(self):
         print(f"[OmniTrainingModule] configure_optimizers")
@@ -190,198 +181,57 @@ class OmniTrainingModule(pl.LightningModule):
     # TODO CFG
     # TODO 看lora是怎么弄的
     # TODO 训练的时候，视频大小是不是要跟之前的模型保持一致
-    # TODO 一定要搞清楚，模型每一步在干啥
+    # TODO 一定要搞清楚，模型每一步在干啥.
+    # TODO 先加checkpointing
     def forward_preprocess(self, batch):
-        args = self.args
-        device = self.device
-        print(f"[OmniTrainingModule forward_preprocess] -> device: {device}")
         time_start = time.time()
 
-        # 计时：数据预处理（视频+音频加载与裁剪）
-        t_preprocess_start = time.time()
-        max_frame = 25
-        max_frame = max_frame // 4 * 4 + 1 if max_frame % 4 != 0 else max_frame - 3  # 对齐inference的调整
-        # TODO 这里360经过vae之后，会变成360/8=45，然后进到模型之后，经过3d卷积的时候，会变成22，导致最后输出的时候跟原图h不一致。
-        # 而inference的时候，h是400，是没问题的。这里要怎么处理？把原视频resize到400x640？还是说后面处理的时候补一下？
-        # 先按resize到400来了
-        target_w, target_h = 640, 400
-
-        video_paths = batch["video_path"]
-        audio_paths = batch["audio_path"]
         prompts = batch["prompt"]
-        batch_size = len(video_paths)
-
-        videos, audios = [], []
-
-        # 处理原视频
-        for i in range(batch_size):
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Loading video: {video_paths[i]}"
-            )
-            t_read_start = time.time()
-            video, _, info = torchvision.io.read_video(video_paths[i], pts_unit="sec")
-            t_read_end = time.time()
-            print(f"[Timer] 视频读取耗时: {t_read_end - t_read_start:.3f} 秒")
-            origin_video_fps = info["video_fps"]  # TODO 这里应该就是用视频本身的fps吧？
-            video_fps = int(round(origin_video_fps))
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Original video fps: {origin_video_fps}, rounded fps: {video_fps}"
-            )
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Raw video shape: {video.shape}"
-            )  # [T, H, W, C]
-            # [T, C, H, W] -> 一次性插值
-            video = video.float() / 255.0
-            video = video.permute(0, 3, 1, 2)  # [T, C, H, W]
-            video = F.interpolate(video, size=(target_h, target_w), mode="bilinear", align_corners=False)
-            video = video.permute(1, 0, 2, 3)  # [C, T, H, W]
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Resized video shape: {video.shape}"
-            )
-
-            origin_video_len = video.shape[1]
-
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Loading audio: {audio_paths[i]}"
-            )
-            t_audio_read_start = time.time()
-            audio, sr = librosa.load(audio_paths[i], sr=args.sample_rate)
-            t_audio_read_end = time.time()
-            print(f"[Timer] 音频读取耗时: {t_audio_read_end - t_audio_read_start:.3f} 秒")
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Raw audio shape: {audio.shape}, sr: {sr}"
-            )
-            samples_per_frame = int(args.sample_rate / video_fps)
-
-            # TODO 短于max的直接丢，不能扩展，扩展会让模型学错东西
-            if origin_video_len <= max_frame:
-                video_clip = video[:, :origin_video_len]
-                audio_clip = audio[: origin_video_len * samples_per_frame]
-                print(
-                    f"[OmniTrainingModule forward_preprocess] -> Video shorter than max_frame, use first {T} frames"
-                )
-            else:
-                start_idx = np.random.randint(0, origin_video_len - max_frame + 1)
-                video_clip = video[:, start_idx : start_idx + max_frame]
-                audio_clip = audio[
-                    start_idx
-                    * samples_per_frame : (start_idx + max_frame)
-                    * samples_per_frame
-                ]
-                print(
-                    f"[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from {start_idx} to {start_idx + max_frame}"
-                )
-
-            L = video_clip.shape[1] # 这个L应该是=max_frame
-            T = (L + 3) // 4
-            print(f"[OmniTrainingModule forward_preprocess] -> L: {L}, T: {T}")
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Final video_clip shape: {video_clip.shape}"
-            )
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Final audio_clip shape: {audio_clip.shape}"
-            )
-
-            # # 保存处理后的视频和音频
-            # save_dir = "./debug_preprocess"
-            # os.makedirs(save_dir, exist_ok=True)
-            # # 保存视频为 mp4
-            # video_clip_save = (video_clip.permute(1, 2, 3, 0).cpu().numpy() * 255).clip(0, 255).astype(np.uint8)
-            # save_video_path = os.path.join(save_dir, f"video_clip_{i}.mp4")
-            # torchvision.io.write_video(save_video_path, video_clip_save, fps=video_fps)
-            # print(f"[OmniTrainingModule forward_preprocess] -> Saved video to {save_video_path}")
-            # # 保存音频为wav
-            # sf.write(os.path.join(save_dir, f"audio_clip_{i}.wav"), audio_clip, args.sample_rate)
-
-            videos.append(video_clip)
-            audios.append(audio_clip)
-        t_preprocess_end = time.time()
-        print(f"[Timer] 数据预处理耗时: {t_preprocess_end - t_preprocess_start:.3f} 秒")
-        
-        # 计时：VAE编码
-        t_vae_start = time.time()
-        videos = torch.stack(videos, dim=0).to(device)  # [B, C, T, H, W]
-        print(
-            f"[OmniTrainingModule forward_preprocess] -> All videos stacked shape: {videos.shape}, videos device: {videos.device}"
-        )
+        videos = batch["video"]
+        audios = batch["audio"]
+        L = batch["L"][0]
+        T = batch["T"][0]
 
         # 视频过vae
+        t_vae_start = time.time()
         self.pipe.load_models_to_device(["vae"])
         with torch.no_grad():
-            # videos=[1, 3, 9, 360, 640]
-            video_latents = self.pipe.encode_video(
-                videos.to(
-                    device=device, dtype=next(self.parameters()).dtype
-                )  # trainer是fp16，但这里是32，要转一下，取参数类型即可
-            )  # [B, latent_dim, T, H', W']
+            # videos=[1, 3, 9, 360, 640]. 这里过vae之后的video_latents在cpu上，因为vae处理逻辑把数据移到cpu了。所以to一下device
+            video_latents = self.pipe.encode_video(videos).to(self.device)  # [B, latent_dim, T, H', W']
             # video_latents=[1, 16, 3, 45, 80]
-        print(
-            f"[OmniTrainingModule forward_preprocess] -> Latent shape: {video_latents.shape}"
-        )
         t_vae_end = time.time()
         print(f"[Timer] VAE编码耗时: {t_vae_end - t_vae_start:.3f} 秒")
 
 
         # 提音频特征
-        # 计时：Wav2Vec音频特征提取
-        t_wav2vec_start = time.time()
-        audio_embs = []
-        for idx, audio_clip in enumerate(audios):
-            input_values = np.squeeze(
-                self.wav_feature_extractor(
-                    audio_clip, sampling_rate=args.sample_rate
-                ).input_values
-            )
-            input_values = torch.from_numpy(input_values).to(device=device, dtype=next(self.audio_encoder.parameters()).dtype)
-            input_values = input_values.unsqueeze(0)
-            with torch.no_grad():
-                hidden_states = self.audio_encoder(
-                    input_values, seq_len=max_frame, output_hidden_states=True
-                )
-                audio_embeddings = hidden_states.last_hidden_state
-                for mid_hidden_states in hidden_states.hidden_states:
-                    audio_embeddings = torch.cat(
-                        (audio_embeddings, mid_hidden_states), -1
-                    )
-            audio_embs.append(audio_embeddings.squeeze(0))
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Audio embedding {idx} shape: {audio_embeddings.shape}"
-            )
-        # 这里将list合成batch tensor
-        audio_embs = torch.stack(audio_embs, dim=0)  # [B, ...]
-        t_wav2vec_end = time.time()
-        print(f"[Timer] Wav2Vec音频特征提取耗时: {t_wav2vec_end - t_wav2vec_start:.3f} 秒")
-            
+        with torch.no_grad():
+            hidden_states = self.audio_encoder(audios, seq_len=L, output_hidden_states=True)
+            audio_embeddings = hidden_states.last_hidden_state
+            for mid_hidden_states in hidden_states.hidden_states:
+                audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
+        
+        
         # TODO 构造图像条件image_emb，要check逻辑
         B, C, T, H, W = video_latents.shape
         prefix_lat_frame = 1
-        # 构造 image_cat: 取前prefix_lat_frame帧，repeat到T帧
         image_cat = video_latents[:, :, :prefix_lat_frame]  # [B, C, prefix_lat_frame, H, W]
         image_cat = image_cat.repeat(1, 1, T, 1, 1)    # [B, C, T, H, W]
-        # 构造 mask: 已知帧为0，其余为1
         msk = torch.ones(B, 1, T, H, W, device=video_latents.device, dtype=video_latents.dtype)
         msk[:, :, :prefix_lat_frame] = 0
-        # 拼接
         image_emb = {}
         image_emb['y'] = torch.cat([image_cat, msk], dim=1)  # [B, C+1, T, H, W]
 
-        # 计时：后处理与组装
-        t_post_start = time.time()
-        # TODO 组装数据，放到目标设备上，这里不一定要放到cuda
-        target_device = device  # 或 next(self.parameters()).device
-        batch_inputs = {
-            "input_latents": video_latents.to(target_device),
-            "image_emb": {k: v.to(target_device) for k, v in image_emb.items()},
-            "prompt": prompts,
-            "audio_emb": audio_embs.to(target_device) if audio_embs is not None else None,
-        }
-        noise = torch.randn_like(video_latents).to(target_device)
-        batch_inputs["noise"] = noise
-        t_post_end = time.time()
-        print(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
-        print(f"[Timer] 后处理与组装耗时: {t_post_end - t_post_start:.3f} 秒")
 
+        # 组装数据
+        batch_inputs = {
+            "input_latents": video_latents,
+            "image_emb": {k: v for k, v in image_emb.items()},
+            "prompt": prompts,
+            "audio_emb": audio_embeddings,
+        }
+        noise = torch.randn_like(video_latents)
+        batch_inputs["noise"] = noise
+        
         print(f"[Timer] forward_preprocess 总耗时: {time.time() - time_start:.3f} 秒")
         print(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
-        
         return batch_inputs
