@@ -1,9 +1,5 @@
 import os
-import warnings
-import imageio
-from PIL import Image
 import pandas as pd
-import json
 import librosa
 import torch
 import torchvision
@@ -56,57 +52,27 @@ class WanVideoDataset(torch.utils.data.Dataset):
         audio, sr = librosa.load(audio_path, sr=args.sample_rate)
         samples_per_frame = int(args.sample_rate / video_fps)
 
-        # TODO 短于max的直接丢，不能扩展，扩展会让模型学错东西
+        # 短于max的直接丢，不能扩展，扩展会让模型学错东西
         if origin_video_len <= max_frame:
-            video_clip = video[:, :origin_video_len]
-            audio_clip = audio[: origin_video_len * samples_per_frame]
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Video shorter than max_frame, use first {T} frames"
-            )
+            print(f"[WanVideoDataset __getitem__] -> Video shorter than max_frame, drop this video")
+            return None
         else:
             start_idx = np.random.randint(0, origin_video_len - max_frame + 1)
             video_clip = video[:, start_idx : start_idx + max_frame]
-            audio_clip = audio[
-                start_idx
-                * samples_per_frame : (start_idx + max_frame)
-                * samples_per_frame
-            ]
-            print(
-                f"[OmniTrainingModule forward_preprocess] -> Video longer than max_frame, crop from {start_idx} to {start_idx + max_frame}"
-            )
+            audio_clip = audio[start_idx * samples_per_frame : (start_idx + max_frame) * samples_per_frame]
+            print(f"[WanVideoDataset __getitem__] -> Video longer than max_frame, crop from {start_idx} to {start_idx + max_frame}")
         L = video_clip.shape[1] # 这个L应该是=max_frame
         T = (L + 3) // 4
         
         # 音频特征提取
         audio_latent = np.squeeze(self.wav_feature_extractor(audio_clip, sampling_rate=args.sample_rate).input_values)
         audio_latent = torch.from_numpy(audio_latent)
-        # audio_latent = audio_latent.unsqueeze(0)
         
         data['video'] = video_clip
         data['audio'] = audio_latent
         data['L'] = L
         data['T'] = T
         
-        return data
-    
-    def __len__(self):
-        return len(self.data)
-    
-# TODO validation数据集怎么拆？
-class WanVideoValidationDataset(torch.utils.data.Dataset):
-    def __init__(self, args):
-        dataset_base_path = args.dataset_base_path
-        self.dataset_base_path = dataset_base_path
-        metadata_path = os.path.join(dataset_base_path, "metadata.csv")
-        self.metadata_path = metadata_path
-        
-        # 从预处理好的csv或者json里面读出来, 是个数组
-        metadata = pd.read_csv(metadata_path)
-        data_len = min(args.debug_data_len, len(metadata)) if args.debug else len(metadata)
-        self.data = [metadata.iloc[i].to_dict() for i in range(data_len)]
-    
-    def __getitem__(self, data_id):
-        data = self.data[data_id % len(self.data)].copy()
         return data
     
     def __len__(self):

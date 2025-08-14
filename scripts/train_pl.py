@@ -11,7 +11,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.strategies import DeepSpeedStrategy
 from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
-from OmniAvatar.datasets.datasets import WanVideoDataset, WanVideoValidationDataset
+from OmniAvatar.datasets.datasets import WanVideoDataset
 from OmniAvatar.models.training_module import OmniTrainingModule
 import setproctitle
 from omegaconf import OmegaConf
