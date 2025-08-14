@@ -87,7 +87,7 @@ def main():
         )
         # TODO 这里拆validation数据集
         test_dataloader = DataLoader(
-            WanVideoValidationDataset(args),
+            WanVideoDataset(args, validation=True),
             batch_size=config.batch_size,
             num_workers=6,
         )

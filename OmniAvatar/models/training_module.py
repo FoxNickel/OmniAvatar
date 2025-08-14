@@ -134,6 +134,10 @@ class OmniTrainingModule(pl.LightningModule):
     # def forward(self, data):
     #     return self.pipe.forward(data)
 
+    def validation_step(self, *args, **kwargs):
+        print(f"[OmniTrainingModule] validation_step, args: {args}, kwargs keys: {kwargs.keys()}")
+        return super().validation_step(*args, **kwargs)
+    
     def training_step(self, batch, batch_idx):
         print(
             f"[OmniTrainingModule] training_step -> batch keys: {batch.keys()}, batch_idx: {batch_idx}, batch_size: {len(batch['video_id'])}"
