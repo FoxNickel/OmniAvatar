@@ -266,12 +266,15 @@ class WanInferencePipeline(nn.Module):
             input_values = np.squeeze(
                     self.wav_feature_extractor(audio, sampling_rate=16000).input_values
                 )
+            print(f"input_values shape1: {input_values.shape}")
             input_values = torch.from_numpy(input_values).float().to(device=self.device)
+            print(f"input_values shape2: {input_values.shape}")
 
             # 计算音频对应的视频帧数。len(input_values) / self.args.sample_rate 得到音频的总时长（秒），再乘以 self.args.fps 得到音频对应的视频帧数
             ori_audio_len = audio_len = math.ceil(len(input_values) / self.args.sample_rate * self.args.fps)
             print(f"audio length: {audio_len} frames")
             input_values = input_values.unsqueeze(0) # 这里又扩展出来batch维度了
+            print(f"input_values shape3: {input_values.shape}")
             
             # padding audio, 扩充音频长度到满足视频帧数要求
             print(f"first_fixed_frame: {first_fixed_frame}, fixed_frame: {fixed_frame}")
@@ -285,6 +288,7 @@ class WanInferencePipeline(nn.Module):
 
             # 用预训练的 Wav2VecModel 编码音频，得到 embedding。把所有中间层的 hidden state 拼接到一起，丰富特征表达。
             with torch.no_grad():
+                print(f"input_values shape4: {input_values.shape}")
                 hidden_states = self.audio_encoder(input_values, seq_len=audio_len, output_hidden_states=True)
                 audio_embeddings = hidden_states.last_hidden_state
                 for mid_hidden_states in hidden_states.hidden_states:
