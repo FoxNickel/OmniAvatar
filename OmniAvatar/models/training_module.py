@@ -76,11 +76,6 @@ class OmniTrainingModule(pl.LightningModule):
                 f"[OmniTrainingModule load_model] -> load from {resume_path}, {len(missing_keys)} missing keys, {len(unexpected_keys)} unexpected keys"
             )
 
-        # TODO 待定要不要，先去掉
-        # pipe.enable_vram_management(
-        #     num_persistent_param_in_dit=args.num_persistent_param_in_dit
-        # )
-
         return pipe
 
     def add_lora_to_model(
@@ -179,7 +174,6 @@ class OmniTrainingModule(pl.LightningModule):
     # caption先统一使用原数据集里的caption，后续可以考虑使用翻译模型进行翻译。
     # TODO check对Diffusion的理解：训练时候的输入是原视频ground truth + audio + prompt
     # TODO wave2vec看能不能用lora，看AudioPack、linear的权重大小
-    # TODO cpu adam, checkpointing(deepspeed)
     # TODO 联合训练，模块打开就行
     # TODO 一定量之后validate一下（1k左右），效果在20k的时候看，batch_size=3
     # TODO CFG

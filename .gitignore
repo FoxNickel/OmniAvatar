@@ -4,5 +4,5 @@ demo_out/
 examples/
 outputs/
 .vscode/
-log**
 **debug**
+**log**
