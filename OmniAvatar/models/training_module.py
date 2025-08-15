@@ -119,7 +119,33 @@ class OmniTrainingModule(pl.LightningModule):
         # 模型初始化的时候，device是cpu，等到fit开始的时候，Lightning会自动分配设备
         print(f"[OmniTrainingModule] on_fit_start -> device: {self.device}, param device: {next(self.parameters()).device}")
         self.pipe.device = self.device
+        # 打印模块参数统计
+        self.print_module_param_report(top_n=20)
     
+    def print_module_param_report(self, top_n: int = 20):
+        def module_stats(mod):
+            total = sum(p.numel() for p in mod.parameters())
+            trainable = sum(p.numel() for p in mod.parameters() if p.requires_grad)
+            size_mb = sum(p.numel() * p.element_size() for p in mod.parameters()) / (1024 ** 2)
+            return total, trainable, size_mb
+
+        print("[ModelStats] Top-level children of pipe:")
+        for name, child in self.pipe.named_children():
+            total, trainable, size_mb = module_stats(child)
+            print(f"  {name:30s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
+
+        # 列出按参数量排序的模块（包含子模块），方便定位大模块
+        all_modules = []
+        for name, mod in self.pipe.named_modules():
+            total, trainable, size_mb = module_stats(mod)
+            if total > 0:
+                all_modules.append((name, total, trainable, size_mb))
+        all_modules.sort(key=lambda x: x[1], reverse=True)
+
+        print(f"[ModelStats] Top {top_n} modules by param count:")
+        for name, total, trainable, size_mb in all_modules[:top_n]:
+            print(f"  {name:50s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
+
     def configure_optimizers(self):
         print(f"[OmniTrainingModule] configure_optimizers")
         # 这里应该是传所有需要训练的参数吧？没问题，传给Adam，但他只会更新没有freeze的

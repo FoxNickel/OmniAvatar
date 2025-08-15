@@ -53,3 +53,4 @@ lr: 1e-4
 max_frames: 120
 debug: True
 debug_data_len: 100
+use_checkpoint: True
