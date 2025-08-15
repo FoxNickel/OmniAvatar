@@ -96,7 +96,7 @@ def main():
     trainer_model = OmniTrainingModule(args)
 
     # 设置可训练的模块
-    trainer_model.freeze_except(["lora", "audio_encoder"])
+    trainer_model.freeze_except(["lora", "audio_encoder", "audio_proj", "audio_cond_projs"])
 
     print(f"===================[train_pl.py]-main-] model summary================================")
     for name, p in trainer_model.named_parameters():

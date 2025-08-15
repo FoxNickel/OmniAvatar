@@ -12,6 +12,7 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 from typing import Optional
+from .utils.args_config import args
 from .vram_management import enable_vram_management, AutoWrappedModule, AutoWrappedLinear
 from .models.wan_video_text_encoder import T5RelativeEmbedding, T5LayerNorm
 from .models.wan_video_dit import RMSNorm
@@ -242,6 +243,7 @@ class WanVideoPipeline(BasePipeline):
             **image_emb,
             audio_emb=audio_emb,
             **extra_input,
+            use_gradient_checkpointing=args.use_checkpoint
         )
         print(f"[WanVideoPipeline] model_fn -> noise_pred_posi shape: {noise_pred_posi.shape}, dtype: {noise_pred_posi.dtype}, device: {noise_pred_posi.device}")
         return noise_pred_posi

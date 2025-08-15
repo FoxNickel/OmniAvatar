@@ -120,7 +120,7 @@ class OmniTrainingModule(pl.LightningModule):
         print(f"[OmniTrainingModule] on_fit_start -> device: {self.device}, param device: {next(self.parameters()).device}")
         self.pipe.device = self.device
         # 打印模块参数统计
-        self.print_module_param_report(top_n=20)
+        self.print_module_param_report(top_n=50)
     
     def print_module_param_report(self, top_n: int = 20):
         def module_stats(mod):
@@ -145,6 +145,11 @@ class OmniTrainingModule(pl.LightningModule):
         print(f"[ModelStats] Top {top_n} modules by param count:")
         for name, total, trainable, size_mb in all_modules[:top_n]:
             print(f"  {name:50s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
+            
+        print(f"[ModelStats] Top {top_n} trainable modules by param count:")
+        for name, total, trainable, size_mb in all_modules:
+            if trainable > 0:
+                print(f"  {name:50s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
 
     def configure_optimizers(self):
         print(f"[OmniTrainingModule] configure_optimizers")
@@ -186,6 +191,12 @@ class OmniTrainingModule(pl.LightningModule):
                 parameter.requires_grad = True
             else:
                 parameter.requires_grad = False
+        
+        for name, module in self.named_modules():
+            if any([key in name for key in trainable_model_names]):
+                module.train()
+            else:
+                module.eval()
 
     def freeze(self, frozen_model_names):
         for name, parameter in self.named_parameters():
@@ -193,6 +204,12 @@ class OmniTrainingModule(pl.LightningModule):
                 parameter.requires_grad = False
             else:
                 parameter.requires_grad = True
+        
+        for name, module in self.named_modules():
+            if any([key in name for key in frozen_model_names]):
+                module.eval()
+            else:
+                module.train()
 
     # 这一步是对输入数据进行预处理，主要是将输入数据转换为模型需要的格式和参数。
     # 视频处理方式：最大帧数为120帧，超过的随机切片，少于的pad到120帧，分辨率640x360。

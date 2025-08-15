@@ -2,11 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import deepspeed
+checkpoint = deepspeed.checkpointing.checkpoint
+from ..utils.args_config import args
 from typing import Tuple, Optional
 from einops import rearrange
 from ..utils.io_utils import hash_state_dict_keys
 from .audio_pack import AudioPack
-from ..utils.args_config import args
 from xfuser.core.distributed import (get_sequence_parallel_rank,
                                      get_sequence_parallel_world_size,
                                      get_sp_group)
@@ -109,6 +111,13 @@ class RMSNorm(nn.Module):
         return x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + self.eps)
 
     def forward(self, x):
+        print(f"[RMSNorm forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint and self.training:
+            return checkpoint(self._forward, x)
+        else:
+            return self._forward(x)
+    
+    def _forward(self, x):
         dtype = x.dtype
         return self.norm(x.float()).to(dtype) * self.weight
 
@@ -117,8 +126,15 @@ class AttentionModule(nn.Module):
     def __init__(self, num_heads):
         super().__init__()
         self.num_heads = num_heads
-        
+    
     def forward(self, q, k, v):
+        print(f"[AttentionModule forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint and self.training:
+            return checkpoint(self._forward, q, k, v)
+        else:
+            return self._forward(q, k, v)
+    
+    def _forward(self, q, k, v):
         x = flash_attention(q=q, k=k, v=v, num_heads=self.num_heads)
         return x
 
@@ -140,6 +156,13 @@ class SelfAttention(nn.Module):
         self.attn = AttentionModule(self.num_heads)
 
     def forward(self, x, freqs):
+        print(f"[SelfAttention forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint and self.training:
+            return checkpoint(self._forward, x, freqs)
+        else:
+            return self._forward(x, freqs)
+
+    def _forward(self, x, freqs):
         q = self.norm_q(self.q(x))
         k = self.norm_k(self.k(x))
         v = self.v(x)
@@ -171,6 +194,13 @@ class CrossAttention(nn.Module):
         self.attn = AttentionModule(self.num_heads)
 
     def forward(self, x: torch.Tensor, y: torch.Tensor):
+        print(f"[CrossAttention forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint and self.training:
+            return checkpoint(self._forward, x, y)
+        else:
+            return self._forward(x, y)
+
+    def _forward(self, x: torch.Tensor, y: torch.Tensor):
         if self.has_image_input:
             img = y[:, :257]
             ctx = y[:, 257:]
@@ -191,8 +221,15 @@ class CrossAttention(nn.Module):
 class GateModule(nn.Module):
     def __init__(self,):
         super().__init__()
-
+        
     def forward(self, x, gate, residual):
+        print(f"[GateModule forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint and self.training:
+            return checkpoint(self._forward, x, gate, residual)
+        else:
+            return self._forward(x, gate, residual)
+
+    def _forward(self, x, gate, residual):
         return x + gate * residual
 
 # DiTBlock 是 WanModel 的核心构建单元，结合自注意力、跨模态注意力、MLP、归一化和时序调制，实现时空建模和多模态条件融合，是视频生成 Transformer 的关键模块。
@@ -219,6 +256,13 @@ class DiTBlock(nn.Module):
         self.gate = GateModule()
 
     def forward(self, x, context, t_mod, freqs):
+        print(f"[DiTBlock forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint and self.training:
+            return checkpoint(self._forward, x, context, t_mod, freqs)
+        else:
+            return self._forward(x, context, t_mod, freqs)
+    
+    def _forward(self, x, context, t_mod, freqs):
         # msa: multi-head self-attention  mlp: multi-layer perceptron
         # t_mod: 当前时间步的调制参数，和modulation参数相加后分成6份
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (
@@ -245,8 +289,15 @@ class MLP(torch.nn.Module):
             nn.Linear(in_dim, out_dim),
             nn.LayerNorm(out_dim)
         )
-
+        
     def forward(self, x):
+        print(f"[MLP forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint and self.training:
+            return checkpoint(self._forward, x)
+        else:
+            return self._forward(x)
+
+    def _forward(self, x):
         return self.proj(x)
 
 
@@ -260,6 +311,13 @@ class Head(nn.Module):
         self.modulation = nn.Parameter(torch.randn(1, 2, dim) / dim**0.5)
 
     def forward(self, x, t_mod):
+        print(f"[Head forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint and self.training:
+            return checkpoint(self._forward, x, t_mod)
+        else:
+            return self._forward(x, t_mod)
+
+    def _forward(self, x, t_mod):
         shift, scale = (self.modulation.to(dtype=t_mod.dtype, device=t_mod.device) + t_mod).chunk(2, dim=1)
         x = (self.head(self.norm(x) * (1 + scale) + shift))
         return x
@@ -348,23 +406,23 @@ class WanModel(torch.nn.Module):
                 self.audio_cond_projs.append(l)
         
         # 打印各主要模块结构和参数
-        print("\n[WanModel] patch_embedding:", self.patch_embedding)
-        print("[WanModel] text_embedding:", self.text_embedding)
-        print("[WanModel] time_embedding:", self.time_embedding)
-        print("[WanModel] time_projection:", self.time_projection)
-        print("[WanModel] blocks (DiTBlock):")
-        for i, block in enumerate(self.blocks):
-            print(f"  Block {i}: {block}")
-        print("[WanModel] head:", self.head)
-        print("[WanModel] RoPE freqs shape:", [f.shape for f in self.freqs])
-        if hasattr(self, "img_emb"):
-            print("[WanModel] img_emb:", self.img_emb)
-        if hasattr(self, "audio_proj"):
-            print("[WanModel] audio_proj:", self.audio_proj)
-        if hasattr(self, "audio_cond_projs"):
-            print("[WanModel] audio_cond_projs:")
-            for i, proj in enumerate(self.audio_cond_projs):
-                print(f"  Audio Cond Proj {i}: {proj}")
+        # print("\n[WanModel] patch_embedding:", self.patch_embedding)
+        # print("[WanModel] text_embedding:", self.text_embedding)
+        # print("[WanModel] time_embedding:", self.time_embedding)
+        # print("[WanModel] time_projection:", self.time_projection)
+        # print("[WanModel] blocks (DiTBlock):")
+        # for i, block in enumerate(self.blocks):
+        #     print(f"  Block {i}: {block}")
+        # print("[WanModel] head:", self.head)
+        # print("[WanModel] RoPE freqs shape:", [f.shape for f in self.freqs])
+        # if hasattr(self, "img_emb"):
+        #     print("[WanModel] img_emb:", self.img_emb)
+        # if hasattr(self, "audio_proj"):
+        #     print("[WanModel] audio_proj:", self.audio_proj)
+        # if hasattr(self, "audio_cond_projs"):
+        #     print("[WanModel] audio_cond_projs:")
+        #     for i, proj in enumerate(self.audio_cond_projs):
+        #         print(f"  Audio Cond Proj {i}: {proj}")
 
     def patchify(self, x: torch.Tensor):
         grid_size = x.shape[2:]
@@ -377,8 +435,26 @@ class WanModel(torch.nn.Module):
             f=grid_size[0], h=grid_size[1], w=grid_size[2], 
             x=self.patch_size[0], y=self.patch_size[1], z=self.patch_size[2]
         )
-
+    
     def forward(self,
+            x: torch.Tensor,                      # 输入视频latent或特征
+            timestep: torch.Tensor,               # 当前扩散时间步（整数或向量）
+            context: torch.Tensor,                # 文本条件embedding
+            clip_feature: Optional[torch.Tensor] = None, # 可选CLIP图像特征（未用到）
+            y: Optional[torch.Tensor] = None,     # 图片条件embedding（如mask拼接）
+            use_gradient_checkpointing: bool = False,     # 是否使用梯度检查点，节省显存
+            audio_emb: Optional[torch.Tensor] = None,     # 音频条件embedding
+            use_gradient_checkpointing_offload: bool = False, # 是否将checkpoint临时存CPU
+            tea_cache = None,                     # 分布式推理缓存
+            **kwargs,
+            ):
+        print(f"[WanModel forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint and self.training:
+            return checkpoint(self._forward, x, timestep, context, clip_feature, y, use_gradient_checkpointing, audio_emb, use_gradient_checkpointing_offload, tea_cache, **kwargs)
+        else:
+            return self._forward(x, timestep, context, clip_feature, y, use_gradient_checkpointing, audio_emb, use_gradient_checkpointing_offload, tea_cache, **kwargs)
+
+    def _forward(self,
             x: torch.Tensor,                      # 输入视频latent或特征
             timestep: torch.Tensor,               # 当前扩散时间步（整数或向量）
             context: torch.Tensor,                # 文本条件embedding
@@ -469,22 +545,25 @@ class WanModel(torch.nn.Module):
                         x = audio_cond_tmp + x # 音频条件加到主干特征
 
                 # 11. 梯度检查点（节省显存，训练时用）
+                print(f"[WanModel] self.training: {self.training}, use_gradient_checkpointing: {use_gradient_checkpointing}, use_gradient_checkpointing_offload: {use_gradient_checkpointing_offload}, layer_i: {layer_i}")
                 if self.training and use_gradient_checkpointing:
+                    print(f"[WanModel] Using gradient checkpointing1")
                     if use_gradient_checkpointing_offload:
                         with torch.autograd.graph.save_on_cpu():
-                            x = torch.utils.checkpoint.checkpoint(
+                            x = checkpoint(
                                 create_custom_forward(block),
                                 x, context, t_mod, freqs,
-                                use_reentrant=False,
+                                # use_reentrant=False,
                             )
                     else:
-                        # TODO 训练的时候 checkpoint要换，checkpoint的作用是减少显存消耗
-                        x = torch.utils.checkpoint.checkpoint(
+                        print(f"[WanModel] Using gradient checkpointing2 at block {layer_i}")
+                        x = checkpoint(
                             create_custom_forward(block),
                             x, context, t_mod, freqs,
-                            use_reentrant=False,
+                            # use_reentrant=False,
                         )
                 else:
+                    print(f"[WanModel] Normal forward at block {layer_i}")
                     x = block(x, context, t_mod, freqs)
             # 12. 分布式缓存同步
             if tea_cache is not None:
