@@ -1,5 +1,5 @@
 # 预训练模型路径
-dtype: "16-mixed" # TODO bf16
+dtype: "32" # TODO bf16
 text_encoder_path: pretrained_models/Wan2.1-T2V-1.3B/models_t5_umt5-xxl-enc-bf16.pth
 image_encoder_path: None
 # dit 是扩散生成的主模型（Diffusion Transformer），负责内容生成。（transformer）
@@ -40,7 +40,7 @@ tea_cache_l1_thresh: 0 # 0.14 The larger this value is, the faster the speed, bu
 
 # 训练参数
 dataset_base_path: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1
-name: train_1.3B
+name: audio_demo
 savedir: /mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs
 batch_size: 1
 # nodes代表分布式训练的节点数，devices代表每个节点上的GPU数量

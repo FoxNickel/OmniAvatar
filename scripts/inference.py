@@ -286,14 +286,17 @@ class WanInferencePipeline(nn.Module):
                 audio_len = audio_len + ((L - fixed_frame) - (audio_len - (L - first_fixed_frame)) % (L - fixed_frame))
             input_values = F.pad(input_values, (0, audio_len * int(self.args.sample_rate / self.args.fps) - input_values.shape[1]), mode='constant', value=0)
 
+            print(f"input_values: {input_values}")
             # 用预训练的 Wav2VecModel 编码音频，得到 embedding。把所有中间层的 hidden state 拼接到一起，丰富特征表达。
             with torch.no_grad():
-                print(f"input_values shape4: {input_values.shape}")
+                print(f"[inference]: input_values shape: {input_values.shape}, device: {input_values.device}, dtype: {input_values.dtype}")
+                print(f"[inference]: audio_encoder dtype: {self.audio_encoder.dtype}, device: {self.audio_encoder.device}, audio_len = {audio_len}")
                 hidden_states = self.audio_encoder(input_values, seq_len=audio_len, output_hidden_states=True)
                 audio_embeddings = hidden_states.last_hidden_state
                 for mid_hidden_states in hidden_states.hidden_states:
                     audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
             seq_len = audio_len
+            print(f"audio_embeddings {audio_embeddings}")
             print(f"audio embeddings shape: {audio_embeddings.shape}, seq_len: {seq_len}")
             audio_embeddings = audio_embeddings.squeeze(0) # 这里又把batch维度去掉了
             audio_prefix = torch.zeros_like(audio_embeddings[:first_fixed_frame])

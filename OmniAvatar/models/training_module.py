@@ -27,7 +27,7 @@ class OmniTrainingModule(pl.LightningModule):
         self.audio_encoder = Wav2VecModel.from_pretrained(
             args.wav2vec_path, local_files_only=True
         ).to(device=self.device)
-        self.audio_encoder.train()
+        # self.audio_encoder.train() # TODO就是这句导致音频nan的
         self.audio_encoder.feature_extractor._freeze_parameters()
 
     def load_model(self):
@@ -176,6 +176,7 @@ class OmniTrainingModule(pl.LightningModule):
                 print(f"[Check] {k}: nan={torch.isnan(v).any().item()}, inf={torch.isinf(v).any().item()}, shape={v.shape}")
                 
         loss = self.pipe.training_loss(**inputs)
+        print(f"loss: {loss.item()}, grad_fn: {loss.grad_fn}")
         
         # 检查 loss 是否为 nan 或 inf
         print(f"[Check] loss: nan={torch.isnan(loss).item()}, inf={torch.isinf(loss).item()}, value={loss.item()}")
@@ -230,6 +231,7 @@ class OmniTrainingModule(pl.LightningModule):
         prompts = batch["prompt"]
         videos = batch["video"]
         audios = batch["audio"]
+        print(f"[OmniTrainingModule forward_preprocess] -> audio_path : {batch['audio_path']}, video_path: {batch['video_path']}")
         L = batch["L"][0]
         T = batch["T"][0]
 
@@ -246,11 +248,14 @@ class OmniTrainingModule(pl.LightningModule):
 
         # 提音频特征
         with torch.no_grad():
+            print(f"[OmniTrainingModule forward_preprocess] -> audios dtype: {audios.dtype}, device: {audios.device}, shape: {audios.shape}")
+            print(f"[OmniTrainingModule forward_preprocess] -> self.audio_encoder dtype: {self.audio_encoder.dtype}, device: {self.audio_encoder.device}")
+            print(f"input_values: {audios}")
             hidden_states = self.audio_encoder(audios, seq_len=L, output_hidden_states=True)
             audio_embeddings = hidden_states.last_hidden_state
             for mid_hidden_states in hidden_states.hidden_states:
                 audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
-        
+            print(f"audio_embeddings {audio_embeddings}")    
         
         # TODO 构造图像条件image_emb，要check逻辑
         B, C, T, H, W = video_latents.shape

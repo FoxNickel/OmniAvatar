@@ -30,6 +30,7 @@ class WanVideoDataset(torch.utils.data.Dataset):
         data = self.data[data_id % len(self.data)].copy()
         args = self.args
         
+        # TODO 帧数太低，要改高
         max_frame = 25
         max_frame = max_frame // 4 * 4 + 1 if max_frame % 4 != 0 else max_frame - 3  # 对齐inference的调整
         # TODO 这里360经过vae之后，会变成360/8=45，然后进到模型之后，经过3d卷积的时候，会变成22，导致最后输出的时候跟原图h不一致。
