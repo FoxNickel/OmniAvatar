@@ -6,6 +6,7 @@ from torch import nn
 import deepspeed
 checkpoint = deepspeed.checkpointing.checkpoint
 from ..utils.args_config import args
+from OmniAvatar.utils.log import log
 
 
 def make_triple(value: Union[int, Tuple[int, int, int]]) -> Tuple[int, int, int]:
@@ -34,14 +35,14 @@ class AudioPack(nn.Module):
         else:
             self.norm_out = None
         
-        # print(f"[AudioPack] in_channels: {in_channels}, t, h, w: {t}, {h}, {w}")
-        # print(f"[AudioPack] patch_size: {self.patch_size}")
-        # print(f"[AudioPack] proj: {self.proj}")
+        # log(f"[AudioPack] in_channels: {in_channels}, t, h, w: {t}, {h}, {w}")
+        # log(f"[AudioPack] patch_size: {self.patch_size}")
+        # log(f"[AudioPack] proj: {self.proj}")
         # if self.norm_out is not None:
-        #     print(f"[AudioPack] norm_out: {self.norm_out}")
+        #     log(f"[AudioPack] norm_out: {self.norm_out}")
 
     def forward(self, vid: torch.Tensor):
-        print(f"[AudioPack forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        log(f"[AudioPack forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
         if args.use_checkpoint and self.training:
             return checkpoint(self._forward, vid)
         else:
@@ -49,7 +50,7 @@ class AudioPack(nn.Module):
 
     def _forward(self, vid: torch.Tensor,) -> torch.Tensor:
         t, h, w = self.patch_size
-        print(f"[AudioPack forward] vid shape: {vid.shape}, t, h, w: {t}, {h}, {w}")
+        log(f"[AudioPack forward] vid shape: {vid.shape}, t, h, w: {t}, {h}, {w}")
         vid = rearrange(vid, "b c (T t) (H h) (W w) -> b T H W (t h w c)", t=t, h=h, w=w)
         vid = self.proj(vid)
         if self.norm_out is not None:

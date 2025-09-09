@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
+from OmniAvatar.utils.log import log
 
 CACHE_T = 2
 
@@ -516,10 +517,10 @@ class VideoVAE_(nn.Module):
         self.decoder = Decoder3d(dim, z_dim, dim_mult, num_res_blocks,
                                  attn_scales, self.temperal_upsample, dropout)
         
-        print("\n[VideoVAE_] encoder:", self.encoder)
-        print("[VideoVAE_] conv1:", self.conv1)
-        print("[VideoVAE_] conv2:", self.conv2)
-        print("[VideoVAE_] decoder:", self.decoder)
+        log(f"\n[VideoVAE_] encoder: {self.encoder}")
+        log(f"[VideoVAE_] conv1: {self.conv1}")
+        log(f"[VideoVAE_] conv2: {self.conv2}")
+        log(f"[VideoVAE_] decoder: {self.decoder}\n")
 
     def forward(self, x):
         mu, log_var = self.encode(x)
@@ -761,7 +762,7 @@ class WanVideoVAE(nn.Module):
 
 
     def encode(self, videos, device, tiled=False, tile_size=(34, 34), tile_stride=(18, 16)):
-        print(f"[WanVideoVAE] encode: videos {videos.shape}, device {device}, tiled {tiled}, tile_size {tile_size}, tile_stride {tile_stride}")
+        log(f"[WanVideoVAE] encode: videos {videos.shape}, device {device}, tiled {tiled}, tile_size {tile_size}, tile_stride {tile_stride}")
         videos = [video.to("cpu") for video in videos]
         hidden_states = []
         for video in videos:

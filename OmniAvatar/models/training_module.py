@@ -8,19 +8,18 @@ from OmniAvatar.models.model_manager import ModelManager
 from OmniAvatar.utils.io_utils import load_state_dict
 from OmniAvatar.wan_video import WanVideoPipeline
 from deepspeed.ops.adam import DeepSpeedCPUAdam
+from OmniAvatar.utils.log import log
 
 
 class OmniTrainingModule(pl.LightningModule):
     def __init__(self, args):
-        print(f"[OmniTrainingModule] __init__")
+        log(f"[OmniTrainingModule] __init__")
         super().__init__()
         self.args = args
 
         # 加载模型
         self.pipe = self.load_model()
-        print(
-            f"[OmniTrainingModule __init__]: Model loaded on {self.device}, dtype: {self.dtype}"
-        )
+        log(f"[OmniTrainingModule __init__]: Model loaded on {self.device}, dtype: {self.dtype}")
 
         # 加载音频模型Wav2Vec
         from OmniAvatar.models.wav2vec import Wav2VecModel
@@ -56,9 +55,7 @@ class OmniTrainingModule(pl.LightningModule):
         )
 
         if args.train_architecture == "lora":
-            print(
-                f"[OmniTrainingModule load_model] -> Use LoRA: lora rank: {args.lora_rank}, lora alpha: {args.lora_alpha}, pretrained_lora_path: {pretrained_lora_path}"
-            )
+            log(f"[OmniTrainingModule load_model] -> Use LoRA: lora rank: {args.lora_rank}, lora alpha: {args.lora_alpha}, pretrained_lora_path: {pretrained_lora_path}")
             self.add_lora_to_model(
                 pipe.denoising_model(),
                 lora_rank=args.lora_rank,
@@ -71,9 +68,7 @@ class OmniTrainingModule(pl.LightningModule):
             missing_keys, unexpected_keys = pipe.denoising_model().load_state_dict(
                 load_state_dict(resume_path), strict=True
             )
-            print(
-                f"[OmniTrainingModule load_model] -> load from {resume_path}, {len(missing_keys)} missing keys, {len(unexpected_keys)} unexpected keys"
-            )
+            log(f"[OmniTrainingModule load_model] -> load from {resume_path}, {len(missing_keys)} missing keys, {len(unexpected_keys)} unexpected keys")
 
         return pipe
 
@@ -97,7 +92,7 @@ class OmniTrainingModule(pl.LightningModule):
             init_lora_weights=init_lora_weights,
             target_modules=lora_target_modules.split(","),
         )
-        print(f"[OmniTrainingModule add_lora_to_model] -> lora_config: {lora_config}")
+        log(f"[OmniTrainingModule add_lora_to_model] -> lora_config: {lora_config}")
         model = inject_adapter_in_model(lora_config, model)
 
         if pretrained_lora_path is not None:
@@ -110,16 +105,14 @@ class OmniTrainingModule(pl.LightningModule):
             all_keys = [i for i, _ in model.named_parameters()]
             num_updated_keys = len(all_keys) - len(missing_keys)
             num_unexpected_keys = len(unexpected_keys)
-            print(
-                f"[OmniTrainingModule add_lora_to_model] -> {num_updated_keys} parameters are loaded from {pretrained_lora_path}. {num_unexpected_keys} parameters are unexpected."
-            )
+            log(f"[OmniTrainingModule add_lora_to_model] -> {num_updated_keys} parameters are loaded from {pretrained_lora_path}. {num_unexpected_keys} parameters are unexpected.")
 
     def on_fit_start(self):
         # 模型初始化的时候，device是cpu，等到fit开始的时候，Lightning会自动分配设备
-        print(f"[OmniTrainingModule] on_fit_start -> device: {self.device}, param device: {next(self.parameters()).device}")
+        log(f"[OmniTrainingModule] on_fit_start -> device: {self.device}, param device: {next(self.parameters()).device}")
         self.pipe.device = self.device
         # 打印模块参数统计
-        self.print_module_param_report(top_n=50)
+        # self.print_module_param_report(top_n=50)
     
     def print_module_param_report(self, top_n: int = 20):
         def module_stats(mod):
@@ -128,10 +121,10 @@ class OmniTrainingModule(pl.LightningModule):
             size_mb = sum(p.numel() * p.element_size() for p in mod.parameters()) / (1024 ** 2)
             return total, trainable, size_mb
 
-        print("[ModelStats] Top-level children of pipe:")
+        log("[ModelStats] Top-level children of pipe:")
         for name, child in self.pipe.named_children():
             total, trainable, size_mb = module_stats(child)
-            print(f"  {name:30s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
+            log(f"  {name:30s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
 
         # 列出按参数量排序的模块（包含子模块），方便定位大模块
         all_modules = []
@@ -141,17 +134,17 @@ class OmniTrainingModule(pl.LightningModule):
                 all_modules.append((name, total, trainable, size_mb))
         all_modules.sort(key=lambda x: x[1], reverse=True)
 
-        print(f"[ModelStats] Top {top_n} modules by param count:")
+        log(f"[ModelStats] Top {top_n} modules by param count:")
         for name, total, trainable, size_mb in all_modules[:top_n]:
-            print(f"  {name:50s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
+            log(f"  {name:50s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
             
-        print(f"[ModelStats] Top {top_n} trainable modules by param count:")
+        log(f"[ModelStats] Top {top_n} trainable modules by param count:")
         for name, total, trainable, size_mb in all_modules:
             if trainable > 0:
-                print(f"  {name:50s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
+                log(f"  {name:50s} params={total:,}  trainable={trainable:,}  size={size_mb:.2f} MB")
 
     def configure_optimizers(self):
-        print(f"[OmniTrainingModule] configure_optimizers")
+        log(f"[OmniTrainingModule] configure_optimizers")
         # 这里应该是传所有需要训练的参数吧？没问题，传给Adam，但他只会更新没有freeze的
         return DeepSpeedCPUAdam(self.parameters(), lr=float(self.args.lr))
 
@@ -160,28 +153,26 @@ class OmniTrainingModule(pl.LightningModule):
     #     return self.pipe.forward(data)
 
     def validation_step(self, *args, **kwargs):
-        print(f"[OmniTrainingModule] validation_step, args: {args}, kwargs keys: {kwargs.keys()}")
+        log(f"[OmniTrainingModule] validation_step, args: {args}, kwargs keys: {kwargs.keys()}")
         return super().validation_step(*args, **kwargs)
     
     def training_step(self, batch, batch_idx):
-        print(
-            f"[OmniTrainingModule] training_step -> batch keys: {batch.keys()}, batch_idx: {batch_idx}, batch_size: {len(batch['video_id'])}"
-        )
+        log(f"[OmniTrainingModule] training_step -> batch keys: {batch.keys()}, batch_idx: {batch_idx}, batch_size: {len(batch['video_id'])}")
 
         inputs = self.forward_preprocess(batch)
         
-        for k, v in inputs.items():
-            if isinstance(v, torch.Tensor):
-                print(f"[Check] {k}: nan={torch.isnan(v).any().item()}, inf={torch.isinf(v).any().item()}, shape={v.shape}")
+        # for k, v in inputs.items():
+        #     if isinstance(v, torch.Tensor):
+        #         log(f"[Check] {k}: nan={torch.isnan(v).any().item()}, inf={torch.isinf(v).any().item()}, shape={v.shape}")
                 
         loss = self.pipe.training_loss(**inputs)
-        print(f"loss: {loss.item()}, grad_fn: {loss.grad_fn}")
+        log(f"loss: {loss.item()}, grad_fn: {loss.grad_fn}")
         
         # 检查 loss 是否为 nan 或 inf
-        print(f"[Check] loss: nan={torch.isnan(loss).item()}, inf={torch.isinf(loss).item()}, value={loss.item()}")
+        log(f"[Check] loss: nan={torch.isnan(loss).item()}, inf={torch.isinf(loss).item()}, value={loss.item()}")
 
         
-        print(f"[OmniTrainingModule] training_step -> loss: {loss.item()}")
+        log(f"[OmniTrainingModule] training_step -> loss: {loss.item()}")
         self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, batch_size=len(batch['video_id']))
         return loss
 
@@ -219,7 +210,7 @@ class OmniTrainingModule(pl.LightningModule):
         prompts = batch["prompt"]
         videos = batch["video"]
         audios = batch["audio"]
-        print(f"[OmniTrainingModule forward_preprocess] -> audio_path : {batch['audio_path']}, video_path: {batch['video_path']}")
+        log(f"[OmniTrainingModule forward_preprocess] -> audio_path : {batch['audio_path']}, video_path: {batch['video_path']}")
         L = batch["L"][0]
         T = batch["T"][0]
 
@@ -230,18 +221,18 @@ class OmniTrainingModule(pl.LightningModule):
         video_latents = self.pipe.encode_video(videos).to(self.device)  # [B, latent_dim, T, H', W']
         # video_latents=[1, 16, 3, 45, 80]
         t_vae_end = time.time()
-        print(f"[Timer] VAE编码耗时: {t_vae_end - t_vae_start:.3f} 秒")
+        log(f"[Timer] VAE编码耗时: {t_vae_end - t_vae_start:.3f} 秒")
 
 
         # 提音频特征
-        print(f"[OmniTrainingModule forward_preprocess] -> audios dtype: {audios.dtype}, device: {audios.device}, shape: {audios.shape}")
-        print(f"[OmniTrainingModule forward_preprocess] -> self.audio_encoder dtype: {self.audio_encoder.dtype}, device: {self.audio_encoder.device}")
-        print(f"input_values: {audios}")
+        log(f"[OmniTrainingModule forward_preprocess] -> audios dtype: {audios.dtype}, device: {audios.device}, shape: {audios.shape}")
+        log(f"[OmniTrainingModule forward_preprocess] -> self.audio_encoder dtype: {self.audio_encoder.dtype}, device: {self.audio_encoder.device}")
+        log(f"input_values: {audios}")
         hidden_states = self.audio_encoder(audios, seq_len=L, output_hidden_states=True)
         audio_embeddings = hidden_states.last_hidden_state
         for mid_hidden_states in hidden_states.hidden_states:
             audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
-        print(f"audio_embeddings {audio_embeddings}")    
+        log(f"audio_embeddings {audio_embeddings}")    
         
         # TODO 构造图像条件image_emb，要check逻辑
         B, C, T, H, W = video_latents.shape
@@ -268,6 +259,6 @@ class OmniTrainingModule(pl.LightningModule):
         batch_inputs["input_latents"] = batch_inputs["input_latents"].detach().requires_grad_(True)
         batch_inputs["noise"] = batch_inputs["noise"].detach().requires_grad_(True)
         
-        print(f"[Timer] forward_preprocess 总耗时: {time.time() - time_start:.3f} 秒")
-        print(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
+        log(f"[Timer] forward_preprocess 总耗时: {time.time() - time_start:.3f} 秒")
+        log(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
         return batch_inputs

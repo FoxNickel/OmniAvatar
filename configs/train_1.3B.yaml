@@ -54,3 +54,4 @@ max_frames: 120
 debug: False
 debug_data_len: 100
 use_checkpoint: True
+train_log: False

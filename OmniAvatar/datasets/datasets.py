@@ -6,6 +6,7 @@ import torchvision
 import numpy as np
 import torch.nn.functional as F
 from transformers import Wav2Vec2FeatureExtractor
+from OmniAvatar.utils.log import log
 
 # 调用这个dataset之前，要先调用数据集下面的那个generate_metadata的脚本，生成metadata.csv
 class WanVideoDataset(torch.utils.data.Dataset):
@@ -55,13 +56,13 @@ class WanVideoDataset(torch.utils.data.Dataset):
 
         # 短于max的直接丢，不能扩展，扩展会让模型学错东西
         if origin_video_len <= max_frame:
-            print(f"[WanVideoDataset __getitem__] -> Video shorter than max_frame, drop this video")
+            log(f"[WanVideoDataset __getitem__] -> Video shorter than max_frame, drop this video")
             return None
         else:
             start_idx = np.random.randint(0, origin_video_len - max_frame + 1)
             video_clip = video[:, start_idx : start_idx + max_frame]
             audio_clip = audio[start_idx * samples_per_frame : (start_idx + max_frame) * samples_per_frame]
-            print(f"[WanVideoDataset __getitem__] -> Video longer than max_frame, crop from {start_idx} to {start_idx + max_frame}")
+            log(f"[WanVideoDataset __getitem__] -> Video longer than max_frame, crop from {start_idx} to {start_idx + max_frame}")
         L = video_clip.shape[1] # 这个L应该是=max_frame
         T = (L + 3) // 4
         

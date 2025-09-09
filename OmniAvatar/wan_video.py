@@ -17,6 +17,7 @@ from .vram_management import enable_vram_management, AutoWrappedModule, AutoWrap
 from .models.wan_video_text_encoder import T5RelativeEmbedding, T5LayerNorm
 from .models.wan_video_dit import RMSNorm
 from .models.wan_video_vae import RMS_norm, CausalConv3d, Upsample
+from OmniAvatar.utils.log import log
 
 
 class WanVideoPipeline(BasePipeline):
@@ -185,7 +186,7 @@ class WanVideoPipeline(BasePipeline):
         return {}
 
     def encode_video(self, input_video, tiled=True, tile_size=(34, 34), tile_stride=(18, 16)): # input_video[b,c,f,h,w]
-        print(f"[WanVideoPipeline] encode_video -> input_video device: {input_video.device}, dtype: {input_video.dtype}")
+        log(f"[WanVideoPipeline] encode_video -> input_video device: {input_video.device}, dtype: {input_video.dtype}")
         latents = self.vae.encode(input_video, device=self.device, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
         return latents
 
@@ -197,8 +198,8 @@ class WanVideoPipeline(BasePipeline):
         return {"use_unified_sequence_parallel": self.use_unified_sequence_parallel}
 
     def training_loss(self, **inputs):
-        print(f"[WanVideoPipeline] training_loss -> input keys: {inputs.keys()}, self.torch_dtype = {self.torch_dtype}, self.device = {self.device}")
-        print(f"[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: {self.scheduler.num_train_timesteps}, len(timesteps): {len(self.scheduler.timesteps)}, timesteps: {self.scheduler.timesteps}")
+        log(f"[WanVideoPipeline] training_loss -> input keys: {inputs.keys()}, self.torch_dtype = {self.torch_dtype}, self.device = {self.device}")
+        log(f"[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: {self.scheduler.num_train_timesteps}, len(timesteps): {len(self.scheduler.timesteps)}, timesteps: {self.scheduler.timesteps}")
         # TODO 这里要看一下，这个scheduler设置有没有问题
         self.scheduler.set_timesteps(training=True)
         max_timestep_boundary = int(inputs.get("max_timestep_boundary", 1) * len(self.scheduler.timesteps))
@@ -211,7 +212,7 @@ class WanVideoPipeline(BasePipeline):
         training_target = self.scheduler.training_target(inputs["input_latents"], inputs["noise"], timestep)
 
         noise_pred = self.model_fn(**inputs, timestep=timestep)
-        print(f"[WanVideoPipeline] training_loss -> noise_pred shape: {noise_pred.shape}, dtype: {noise_pred.dtype}, device: {noise_pred.device}, training_target shape: {training_target.shape}, dtype: {training_target.dtype}, device: {training_target.device}")
+        log(f"[WanVideoPipeline] training_loss -> noise_pred shape: {noise_pred.shape}, dtype: {noise_pred.dtype}, device: {noise_pred.device}, training_target shape: {training_target.shape}, dtype: {training_target.dtype}, device: {training_target.device}")
 
         # TODO loss和noise_pred必须requires_grad
         loss = torch.nn.functional.mse_loss(noise_pred.float(), training_target.float())
@@ -221,12 +222,12 @@ class WanVideoPipeline(BasePipeline):
         return loss
 
     def model_fn(self, timestep: torch.Tensor = None, **inputs):
-        print(f"[WanVideoPipeline] model_fn -> input keys: {inputs.keys()}")
+        log(f"[WanVideoPipeline] model_fn -> input keys: {inputs.keys()}")
         latents = inputs.get("latents", None)
         prompt = inputs.get("prompt", "")
         image_emb = inputs.get("image_emb", {})
         audio_emb = inputs.get("audio_emb", {})
-        print(f"[WanVideoPipeline] model_fn -> latents shape: {latents.shape}, timestep: {timestep}, audio_emb shape: {audio_emb.shape}, prompt: {prompt}, image_emb keys: {image_emb.keys()}")
+        log(f"[WanVideoPipeline] model_fn -> latents shape: {latents.shape}, timestep: {timestep}, audio_emb shape: {audio_emb.shape}, prompt: {prompt}, image_emb keys: {image_emb.keys()}")
 
         # Encode prompts
         self.load_models_to_device(["text_encoder"])
@@ -236,7 +237,7 @@ class WanVideoPipeline(BasePipeline):
         extra_input = self.prepare_extra_input(latents)
 
         # TODO 没有tea cache
-        print(f"[WanVideoPipeline] model_fn -> run dit...")
+        log(f"[WanVideoPipeline] model_fn -> run dit...")
         noise_pred_posi = self.dit(
             latents,
             timestep=timestep,
@@ -246,7 +247,7 @@ class WanVideoPipeline(BasePipeline):
             **extra_input,
             use_gradient_checkpointing=args.use_checkpoint
         )
-        print(f"[WanVideoPipeline] model_fn -> noise_pred_posi shape: {noise_pred_posi.shape}, dtype: {noise_pred_posi.dtype}, device: {noise_pred_posi.device}")
+        log(f"[WanVideoPipeline] model_fn -> noise_pred_posi shape: {noise_pred_posi.shape}, dtype: {noise_pred_posi.dtype}, device: {noise_pred_posi.device}")
         return noise_pred_posi
 
     @torch.no_grad()

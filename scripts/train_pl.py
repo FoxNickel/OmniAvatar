@@ -15,6 +15,7 @@ from OmniAvatar.datasets.datasets import WanVideoDataset
 from OmniAvatar.models.training_module import OmniTrainingModule
 import setproctitle
 from omegaconf import OmegaConf
+from OmniAvatar.utils.log import log
 
 
 def get_nested_attr(obj, attr_string):
@@ -28,7 +29,7 @@ def get_nested_attr(obj, attr_string):
 def main():
     pl.seed_everything(args.seed, workers=True)
     config = OmegaConf.load(args.config)
-    print(f"[train_pl.py]-main-] config: {config}")
+    log(f"[train_pl.py]-main-] config: {config}")
     setproctitle.setproctitle(args.name)
     config.name = args.name
     config.savedir = os.path.join(args.savedir, args.name)
@@ -99,13 +100,13 @@ def main():
     # audio_encoder开train会导致音频nan，开dit看看是不是因为模块开少了导致loss为0，不对，应该是因为梯度没有导致loss=0
     trainer_model.freeze_except(["lora", "dit", "audio_proj", "audio_cond_projs"])
 
-    print(f"===================[train_pl.py]-main-] model summary================================")
+    log(f"===================[train_pl.py]-main-] model summary================================")
     for name, p in trainer_model.named_parameters():
-        print(f"[OmniTrainingModule] - name: {name}, requires_grad: {p.requires_grad}")
-    print("===================================================================================")
+        log(f"[OmniTrainingModule] - name: {name}, requires_grad: {p.requires_grad}")
+    log("===================================================================================")
     
     if args.mode == "train":
-        print(f"[OmniTrainingModule]: start training with config: {config}")
+        log(f"[OmniTrainingModule]: start training with config: {config}")
         trainer.fit(
             model=trainer_model,
             train_dataloaders=train_dataloader,
@@ -116,7 +117,7 @@ def main():
 # import debugpy
 # if args.local_rank == 0:
 #     debugpy.listen(5678)
-#     print("Waiting for debugger attach...")
+#     log("Waiting for debugger attach...")
 #     debugpy.wait_for_client()
 if __name__ == "__main__":
     main()
