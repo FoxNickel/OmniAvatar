@@ -74,7 +74,7 @@ def main():
         max_epochs=config.num_train_epochs,
         strategy=strategy,
         sync_batchnorm=True,
-        val_check_interval=5 if args.debug else 100, # TODO 后面要改回来100
+        val_check_interval=5 if args.debug else 100,
         # check_val_every_n_epoch   =     5,
     )
     # config.model.params.global_rank = trainer.global_rank

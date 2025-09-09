@@ -195,10 +195,8 @@ class OmniTrainingModule(pl.LightningModule):
     # 视频处理方式：最大帧数为120帧，超过的随机切片，少于的pad到120帧，分辨率640x360。
     # 音频处理方式：音频采样率为16kHz，音频长度与视频帧数对应。
     # caption先统一使用原数据集里的caption，后续可以考虑使用翻译模型进行翻译。
-    # TODO check对Diffusion的理解：训练时候的输入是原视频ground truth + audio + prompt
     # TODO wave2vec看能不能用lora，看AudioPack、linear的权重大小
-    # TODO 联合训练，模块打开就行
-    # TODO 一定量之后validate一下（1k左右），效果在20k的时候看，batch_size=3
+    # TODO 一定量之后validate一下（1k左右），效果在20k的时候看，batch_size=1
     # TODO CFG
     # TODO 看lora是怎么弄的
     # TODO 训练的时候，视频大小是不是要跟之前的模型保持一致

@@ -12,3 +12,8 @@ def log(str):
         with open("train_log.txt", "a") as f:
             f.write(str + "\n")
         print(str)
+
+def force_log(str):
+    with open("train_log.txt", "a") as f:
+        f.write(str + "\n")
+    print(str)
