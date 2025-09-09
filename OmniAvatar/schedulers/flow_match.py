@@ -29,13 +29,13 @@ class FlowMatchScheduler():
         if self.reverse_sigmas:
             self.sigmas = 1 - self.sigmas
         self.timesteps = self.sigmas * self.num_train_timesteps
-        if training:
-            x = self.timesteps
-            y = torch.exp(-2 * ((x - num_inference_steps / 2) / num_inference_steps) ** 2)
-            y_shifted = y - y.min()
-            bsmntw_weighing = y_shifted * (num_inference_steps / y_shifted.sum())
-            self.linear_timesteps_weights = bsmntw_weighing
-
+        # if training: # 用正态分布给不同时间不赋予不同的权重
+            # x = self.timesteps
+            # y = torch.exp(-2 * ((x - num_inference_steps / 2) / num_inference_steps) ** 2)
+            # y_shifted = y - y.min()
+            # bsmntw_weighing = y_shifted * (num_inference_steps / y_shifted.sum())
+            # self.linear_timesteps_weights = bsmntw_weighing
+            # self.linear_timesteps_weights = self.create_gaussian_weights(num_inference_steps)
 
     def step(self, model_output, timestep, sample, to_final=False, **kwargs):
         if isinstance(timestep, torch.Tensor):

@@ -199,24 +199,25 @@ class WanVideoPipeline(BasePipeline):
     def training_loss(self, **inputs):
         print(f"[WanVideoPipeline] training_loss -> input keys: {inputs.keys()}, self.torch_dtype = {self.torch_dtype}, self.device = {self.device}")
         print(f"[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: {self.scheduler.num_train_timesteps}, len(timesteps): {len(self.scheduler.timesteps)}, timesteps: {self.scheduler.timesteps}")
-        max_timestep_boundary = int(inputs.get("max_timestep_boundary", 1) * self.scheduler.num_train_timesteps)
-        min_timestep_boundary = int(inputs.get("min_timestep_boundary", 0) * self.scheduler.num_train_timesteps)
-        # 防止越界
-        max_timestep_boundary = min(max_timestep_boundary, len(self.scheduler.timesteps))
-        min_timestep_boundary = max(min_timestep_boundary, 0)
-        timestep_id = torch.randint(min_timestep_boundary, max_timestep_boundary, (1,))
         # TODO 这里要看一下，这个scheduler设置有没有问题
         self.scheduler.set_timesteps(training=True)
+        max_timestep_boundary = int(inputs.get("max_timestep_boundary", 1) * len(self.scheduler.timesteps))
+        min_timestep_boundary = int(inputs.get("min_timestep_boundary", 0) * len(self.scheduler.timesteps))
+        timestep_id = torch.randint(min_timestep_boundary, max_timestep_boundary, (1,))
         timestep = self.scheduler.timesteps[timestep_id].to(dtype=self.torch_dtype, device=self.device)
 
         inputs["latents"] = self.scheduler.add_noise(inputs["input_latents"], inputs["noise"], timestep)
+        # TODO 这里training_target用noise就好了吧？为啥要再走一遍scheduler？因为用了flow match
         training_target = self.scheduler.training_target(inputs["input_latents"], inputs["noise"], timestep)
 
         noise_pred = self.model_fn(**inputs, timestep=timestep)
         print(f"[WanVideoPipeline] training_loss -> noise_pred shape: {noise_pred.shape}, dtype: {noise_pred.dtype}, device: {noise_pred.device}, training_target shape: {training_target.shape}, dtype: {training_target.dtype}, device: {training_target.device}")
 
+        # TODO loss和noise_pred必须requires_grad
         loss = torch.nn.functional.mse_loss(noise_pred.float(), training_target.float())
-        loss = loss * self.scheduler.training_weight(timestep)
+        # TODO 这里是给不同时间不赋予不同权重，老代码有问题，先不要了
+        # loss = loss * self.scheduler.training_weight(timestep)
+
         return loss
 
     def model_fn(self, timestep: torch.Tensor = None, **inputs):

@@ -53,7 +53,6 @@ class OmniTrainingModule(pl.LightningModule):
             model_manager,
             device=self.device,  # Lightning自动分配
             use_usp=True if args.sp_size > 1 else False,
-            infer=True,
         )
 
         if args.train_architecture == "lora":
@@ -192,12 +191,6 @@ class OmniTrainingModule(pl.LightningModule):
                 parameter.requires_grad = True
             else:
                 parameter.requires_grad = False
-        
-        for name, module in self.named_modules():
-            if any([key in name for key in trainable_model_names]):
-                module.train()
-            else:
-                module.eval()
 
     def freeze(self, frozen_model_names):
         for name, parameter in self.named_parameters():
@@ -206,11 +199,6 @@ class OmniTrainingModule(pl.LightningModule):
             else:
                 parameter.requires_grad = True
         
-        for name, module in self.named_modules():
-            if any([key in name for key in frozen_model_names]):
-                module.eval()
-            else:
-                module.train()
 
     # 这一步是对输入数据进行预处理，主要是将输入数据转换为模型需要的格式和参数。
     # 视频处理方式：最大帧数为120帧，超过的随机切片，少于的pad到120帧，分辨率640x360。
@@ -238,24 +226,22 @@ class OmniTrainingModule(pl.LightningModule):
         # 视频过vae
         t_vae_start = time.time()
         self.pipe.load_models_to_device(["vae"])
-        with torch.no_grad():
-            # videos=[1, 3, 9, 360, 640]. 这里过vae之后的video_latents在cpu上，因为vae处理逻辑把数据移到cpu了。所以to一下device
-            video_latents = self.pipe.encode_video(videos).to(self.device)  # [B, latent_dim, T, H', W']
-            # video_latents=[1, 16, 3, 45, 80]
+        # videos=[1, 3, 9, 360, 640]. 这里过vae之后的video_latents在cpu上，因为vae处理逻辑把数据移到cpu了。所以to一下device
+        video_latents = self.pipe.encode_video(videos).to(self.device)  # [B, latent_dim, T, H', W']
+        # video_latents=[1, 16, 3, 45, 80]
         t_vae_end = time.time()
         print(f"[Timer] VAE编码耗时: {t_vae_end - t_vae_start:.3f} 秒")
 
 
         # 提音频特征
-        with torch.no_grad():
-            print(f"[OmniTrainingModule forward_preprocess] -> audios dtype: {audios.dtype}, device: {audios.device}, shape: {audios.shape}")
-            print(f"[OmniTrainingModule forward_preprocess] -> self.audio_encoder dtype: {self.audio_encoder.dtype}, device: {self.audio_encoder.device}")
-            print(f"input_values: {audios}")
-            hidden_states = self.audio_encoder(audios, seq_len=L, output_hidden_states=True)
-            audio_embeddings = hidden_states.last_hidden_state
-            for mid_hidden_states in hidden_states.hidden_states:
-                audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
-            print(f"audio_embeddings {audio_embeddings}")    
+        print(f"[OmniTrainingModule forward_preprocess] -> audios dtype: {audios.dtype}, device: {audios.device}, shape: {audios.shape}")
+        print(f"[OmniTrainingModule forward_preprocess] -> self.audio_encoder dtype: {self.audio_encoder.dtype}, device: {self.audio_encoder.device}")
+        print(f"input_values: {audios}")
+        hidden_states = self.audio_encoder(audios, seq_len=L, output_hidden_states=True)
+        audio_embeddings = hidden_states.last_hidden_state
+        for mid_hidden_states in hidden_states.hidden_states:
+            audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
+        print(f"audio_embeddings {audio_embeddings}")    
         
         # TODO 构造图像条件image_emb，要check逻辑
         B, C, T, H, W = video_latents.shape
@@ -277,6 +263,10 @@ class OmniTrainingModule(pl.LightningModule):
         }
         noise = torch.randn_like(video_latents)
         batch_inputs["noise"] = noise
+        
+        # 确保输入有梯度
+        batch_inputs["input_latents"] = batch_inputs["input_latents"].detach().requires_grad_(True)
+        batch_inputs["noise"] = batch_inputs["noise"].detach().requires_grad_(True)
         
         print(f"[Timer] forward_preprocess 总耗时: {time.time() - time_start:.3f} 秒")
         print(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
