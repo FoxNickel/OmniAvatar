@@ -200,7 +200,6 @@ class WanVideoPipeline(BasePipeline):
     def training_loss(self, **inputs):
         log(f"[WanVideoPipeline] training_loss -> input keys: {inputs.keys()}, self.torch_dtype = {self.torch_dtype}, self.device = {self.device}")
         log(f"[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: {self.scheduler.num_train_timesteps}, len(timesteps): {len(self.scheduler.timesteps)}, timesteps: {self.scheduler.timesteps}")
-        # TODO 这里要看一下，这个scheduler设置有没有问题
         self.scheduler.set_timesteps(training=True)
         max_timestep_boundary = int(inputs.get("max_timestep_boundary", 1) * len(self.scheduler.timesteps))
         min_timestep_boundary = int(inputs.get("min_timestep_boundary", 0) * len(self.scheduler.timesteps))
@@ -208,15 +207,14 @@ class WanVideoPipeline(BasePipeline):
         timestep = self.scheduler.timesteps[timestep_id].to(dtype=self.torch_dtype, device=self.device)
 
         inputs["latents"] = self.scheduler.add_noise(inputs["input_latents"], inputs["noise"], timestep)
-        # TODO 这里training_target用noise就好了吧？为啥要再走一遍scheduler？因为用了flow match
+        # 因为用了flow match，这里training_target不能直接用noise，而是做差。我感觉好像没区别。
         training_target = self.scheduler.training_target(inputs["input_latents"], inputs["noise"], timestep)
 
         noise_pred = self.model_fn(**inputs, timestep=timestep)
         log(f"[WanVideoPipeline] training_loss -> noise_pred shape: {noise_pred.shape}, dtype: {noise_pred.dtype}, device: {noise_pred.device}, training_target shape: {training_target.shape}, dtype: {training_target.dtype}, device: {training_target.device}")
 
-        # TODO loss和noise_pred必须requires_grad
         loss = torch.nn.functional.mse_loss(noise_pred.float(), training_target.float())
-        # TODO 这里是给不同时间不赋予不同权重，老代码有问题，先不要了
+        # TODO 这里是给不同时间步赋予不同权重，老代码有问题，先不要了
         # loss = loss * self.scheduler.training_weight(timestep)
 
         return loss

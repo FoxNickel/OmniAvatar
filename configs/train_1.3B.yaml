@@ -45,7 +45,7 @@ savedir: /mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs
 batch_size: 1
 # nodes代表分布式训练的节点数，devices代表每个节点上的GPU数量
 nodes: 1
-devices: 1
+devices: 2
 num_train_epochs: 1
 mode: train
 checkpoint_path: ""

@@ -47,7 +47,7 @@ def main():
         save_last=False,
         save_top_k=-1,
         verbose=True,
-        every_n_train_steps=1500,
+        every_n_train_steps=100,
         save_on_train_epoch_end=True,
     )
 

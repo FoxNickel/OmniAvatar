@@ -35,3 +35,5 @@ negative_prompt: "Vivid color tones, background/camera moving quickly, screen sw
 silence_duration_s: 0.3
 use_fsdp: False
 tea_cache_l1_thresh: 0 # 0.14 The larger this value is, the faster the speed, but the worse the visual quality. TODO check value
+use_checkpoint: True
+train_log: False
