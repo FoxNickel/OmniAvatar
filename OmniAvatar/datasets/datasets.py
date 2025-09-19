@@ -80,7 +80,7 @@ class WanVideoDataset(torch.utils.data.Dataset):
         except Exception as e:
             # 捕获所有可能的异常，记录错误并尝试下一个样本
             force_log(f"[WanVideoDataset __getitem__] -> Error processing item {video_path}: {str(e)}")
-            return self.__getitem__((data_id + 1) % len(self.data))  # 递归获取下一个样本
+            return None
     
     def __len__(self):
         return len(self.data)
