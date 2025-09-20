@@ -6,3 +6,4 @@ outputs/
 .vscode/
 **debug**
 **log**.txt
+logs/

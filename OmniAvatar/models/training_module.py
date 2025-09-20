@@ -173,7 +173,14 @@ class OmniTrainingModule(pl.LightningModule):
 
         
         log(f"[OmniTrainingModule] training_step -> loss: {loss.item()}")
-        self.log("train_loss", loss, prog_bar=True, on_step=True, on_epoch=True, batch_size=len(batch['video_id']))
+        # 合并成一行，同时支持进度条和所有 loggers（包括 TensorBoard）
+        self.log("train_loss", loss,
+                prog_bar=True,           # 进度条显示
+                on_step=True,            # 每步记录
+                on_epoch=True,           # 每轮记录
+                batch_size=len(batch['video_id']),  # batch size
+                logger=True)             # 发送到所有 loggers（TensorBoard/W&B等）
+        
         return loss
 
     def freeze_except(self, trainable_model_names):

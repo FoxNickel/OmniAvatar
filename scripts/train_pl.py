@@ -16,6 +16,8 @@ from OmniAvatar.models.training_module import OmniTrainingModule
 import setproctitle
 from omegaconf import OmegaConf
 from OmniAvatar.utils.log import log
+from pytorch_lightning.loggers import TensorBoardLogger
+tb_logger = TensorBoardLogger("logs/", name="omni_avatar")
 
 
 def get_nested_attr(obj, attr_string):
@@ -34,11 +36,7 @@ def main():
     config.name = args.name
     config.savedir = os.path.join(args.savedir, args.name)
     config.batch_size = args.batch_size
-    # config.model.params.name = config.name
-    # config.model.params.world_size = args.devices
 
-    # obj = get_nested_attr(trainer_model, "model.diffusion_model.output_blocks.8.1.transformer_blocks.0.norm3.weight")
-    # obj.requires_grad = True
     ### Define trainer
     checkpoint_callback = ModelCheckpoint(
         dirpath=os.path.join(config.savedir, "checkpoints"),
@@ -59,6 +57,7 @@ def main():
     )
 
     trainer = pl.Trainer(
+        logger=tb_logger,
         default_root_dir=config.savedir,
         callbacks=[
             checkpoint_callback,
