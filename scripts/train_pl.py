@@ -27,7 +27,6 @@ def get_nested_attr(obj, attr_string):
     return obj
 
 
-# TODO 看一下注释掉的东西啥意思
 def main():
     pl.seed_everything(args.seed, workers=True)
     config = OmegaConf.load(args.config)
@@ -42,13 +41,14 @@ def main():
         dirpath=os.path.join(config.savedir, "checkpoints"),
         filename="{step}",  # -{epoch:02d}
         monitor="step",
-        save_last=False,
+        save_last=True,
         save_top_k=-1,
         verbose=True,
         every_n_train_steps=100,
         save_on_train_epoch_end=True,
     )
 
+    # TODO load_full_weights的含义，以及怎么改False。省显存
     strategy = DeepSpeedStrategy(
         stage=2,
         offload_optimizer=True,
@@ -56,6 +56,8 @@ def main():
         # cpu_checkpointing         =     True,
     )
 
+    # benchmark=True。等价于 torch.backends.cudnn.benchmark=True。对于输入尺寸固定/少变的任务可加速；若每步尺寸变化大，可能反而慢或占用更多缓存。
+    
     trainer = pl.Trainer(
         logger=tb_logger,
         default_root_dir=config.savedir,
@@ -63,7 +65,7 @@ def main():
             checkpoint_callback,
         ],  # ModelSummary(2)
         accelerator="cuda",
-        # accumulate_grad_batches   =     config.gradient_accumulation_steps,
+        # accumulate_grad_batches   =     config.gradient_accumulation_steps, 梯度累积步数。设为 k 时，会累计 k 个小 batch 的梯度再做一次优化器 step，相当于扩大有效 batch size，常用于省显存。
         benchmark=True,
         num_nodes=args.nodes,
         devices=args.devices,
@@ -72,11 +74,11 @@ def main():
         precision=args.dtype,
         max_epochs=config.num_train_epochs,
         strategy=strategy,
-        sync_batchnorm=True,
-        val_check_interval=5 if args.debug else 100,
+        sync_batchnorm=True, # 将 BatchNorm 转为跨 GPU 同步（SyncBatchNorm），使多卡时用全局统计量。多卡小 batch 有帮助，但会增加通信开销；若模型里几乎没有 BN 或已用 LN，可设 False。
+        val_check_interval=100,
         # check_val_every_n_epoch   =     5,
     )
-    # config.model.params.global_rank = trainer.global_rank
+
     ### Define datasets
     if args.mode == "train":
         train_dataloader = DataLoader(
@@ -85,7 +87,6 @@ def main():
             batch_size=config.batch_size,
             num_workers=6,
         )
-        # TODO 这里拆validation数据集
         test_dataloader = DataLoader(
             WanVideoDataset(args, validation=True),
             batch_size=config.batch_size,
