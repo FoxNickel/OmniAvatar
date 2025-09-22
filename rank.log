@@ -1,0 +1,20 @@
+[Rank 2] training_step -> batch_idx: 0, batch_size: 1
+[Rank 2] batch[video] shape: torch.Size([1, 3, 25, 400, 640]), dtype: torch.float16, device: cuda:2
+[Rank 2] batch[audio] shape: torch.Size([1, 13325]), dtype: torch.float16, device: cuda:2
+[Rank 2] batch[L] shape: torch.Size([1]), dtype: torch.int64, device: cuda:2
+[Rank 2] batch[T] shape: torch.Size([1]), dtype: torch.int64, device: cuda:2
+[OmniTrainingModule forward_preprocess] -> audio_path : ['/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/F2xCLOz6qDs_45/audio.wav'], video_path: ['/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/F2xCLOz6qDs_45/video.mp4']
+
+[Rank 3] training_step -> batch_idx: 0, batch_size: 1
+[Rank 3] batch[video] shape: torch.Size([1, 3, 25, 400, 640]), dtype: torch.float16, device: cuda:3
+[Rank 3] batch[audio] shape: torch.Size([1, 16000]), dtype: torch.float16, device: cuda:3
+[Rank 3] batch[L] shape: torch.Size([1]), dtype: torch.int64, device: cuda:3
+[Rank 3] batch[T] shape: torch.Size([1]), dtype: torch.int64, device: cuda:3
+[OmniTrainingModule forward_preprocess] -> audio_path : ['/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_2_sv/dKqrTJ7M5-8_93/audio.wav'], video_path: ['/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_2_sv/dKqrTJ7M5-8_93/video.mp4']
+
+[Rank 0] training_step -> batch_idx: 0, batch_size: 1
+[Rank 0] batch[video] shape: torch.Size([1, 3, 25, 400, 640]), dtype: torch.float16, device: cuda:0
+[Rank 0] batch[audio] shape: torch.Size([1, 16650]), dtype: torch.float16, device: cuda:0
+[Rank 0] batch[L] shape: torch.Size([1]), dtype: torch.int64, device: cuda:0
+[Rank 0] batch[T] shape: torch.Size([1]), dtype: torch.int64, device: cuda:0
+[OmniTrainingModule forward_preprocess] -> audio_path : ['/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_3_sv/MsonnqzY26w_70/audio.wav'], video_path: ['/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_3_sv/MsonnqzY26w_70/video.mp4']

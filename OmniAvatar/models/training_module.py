@@ -9,6 +9,7 @@ from OmniAvatar.utils.io_utils import load_state_dict
 from OmniAvatar.wan_video import WanVideoPipeline
 from deepspeed.ops.adam import DeepSpeedCPUAdam
 from OmniAvatar.utils.log import log
+import torch.distributed as dist
 
 
 class OmniTrainingModule(pl.LightningModule):
@@ -158,6 +159,13 @@ class OmniTrainingModule(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         log(f"[OmniTrainingModule] training_step -> batch keys: {batch.keys()}, batch_idx: {batch_idx}, batch_size: {len(batch['video_id'])}")
+        
+        rank = dist.get_rank() if dist.is_initialized() else 0
+        log(f"[Rank {rank}] training_step -> batch_idx: {batch_idx}, batch_size: {len(batch['video_id'])}")
+        # 打印 batch 主要字段 shape
+        for k, v in batch.items():
+            if isinstance(v, torch.Tensor):
+                log(f"[Rank {rank}] batch[{k}] shape: {v.shape}, dtype: {v.dtype}, device: {v.device}")
 
         inputs = self.forward_preprocess(batch)
         
