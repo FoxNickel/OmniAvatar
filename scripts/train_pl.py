@@ -83,14 +83,17 @@ def main():
     if args.mode == "train":
         train_dataloader = DataLoader(
             WanVideoDataset(args),
-            shuffle=True,
+            shuffle=False,
             batch_size=config.batch_size,
-            num_workers=6,
+            num_workers=10,
+            timeout=60,
+            drop_last=True
         )
         test_dataloader = DataLoader(
             WanVideoDataset(args, validation=True),
             batch_size=config.batch_size,
             num_workers=6,
+            drop_last=True
         )
 
     # 加载要训练的模型
@@ -110,7 +113,7 @@ def main():
         trainer.fit(
             model=trainer_model,
             train_dataloaders=train_dataloader,
-            val_dataloaders=test_dataloader,
+            # val_dataloaders=test_dataloader,
             ckpt_path=None if not os.path.exists(args.checkpoint_path) else args.checkpoint_path,
         )
 

@@ -6,7 +6,7 @@ from torch import nn
 import deepspeed
 checkpoint = deepspeed.checkpointing.checkpoint
 from ..utils.args_config import args
-from OmniAvatar.utils.log import log
+from OmniAvatar.utils.log import log, ckpt_log
 
 
 def make_triple(value: Union[int, Tuple[int, int, int]]) -> Tuple[int, int, int]:
@@ -42,15 +42,15 @@ class AudioPack(nn.Module):
         #     log(f"[AudioPack] norm_out: {self.norm_out}")
 
     def forward(self, vid: torch.Tensor):
-        log(f"[AudioPack forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[AudioPack forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, vid)
         else:
             return self._forward(vid)
 
     def _forward(self, vid: torch.Tensor,) -> torch.Tensor:
         t, h, w = self.patch_size
-        log(f"[AudioPack forward] vid shape: {vid.shape}, t, h, w: {t}, {h}, {w}")
+        # log(f"[AudioPack forward] vid shape: {vid.shape}, t, h, w: {t}, {h}, {w}")
         vid = rearrange(vid, "b c (T t) (H h) (W w) -> b T H W (t h w c)", t=t, h=h, w=w)
         vid = self.proj(vid)
         if self.norm_out is not None:

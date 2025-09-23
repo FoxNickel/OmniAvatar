@@ -154,14 +154,12 @@ class OmniTrainingModule(pl.LightningModule):
     #     return self.pipe.forward(data)
 
     def validation_step(self, *args, **kwargs):
-        log(f"[OmniTrainingModule] validation_step, args: {args}, kwargs keys: {kwargs.keys()}")
+        # log(f"[OmniTrainingModule] validation_step, args: {args}, kwargs keys: {kwargs.keys()}")
         return super().validation_step(*args, **kwargs)
     
     def training_step(self, batch, batch_idx):
-        log(f"[OmniTrainingModule] training_step -> batch keys: {batch.keys()}, batch_idx: {batch_idx}, batch_size: {len(batch['video_id'])}")
-        
         rank = dist.get_rank() if dist.is_initialized() else 0
-        log(f"[Rank {rank}] training_step -> batch_idx: {batch_idx}, batch_size: {len(batch['video_id'])}")
+        log(f"[training_step][rank={rank}] batch_idx={batch_idx} video_path={batch['video_path']}")
         # 打印 batch 主要字段 shape
         for k, v in batch.items():
             if isinstance(v, torch.Tensor):
@@ -174,20 +172,21 @@ class OmniTrainingModule(pl.LightningModule):
         #         log(f"[Check] {k}: nan={torch.isnan(v).any().item()}, inf={torch.isinf(v).any().item()}, shape={v.shape}")
                 
         loss = self.pipe.training_loss(**inputs)
-        log(f"loss: {loss.item()}, grad_fn: {loss.grad_fn}")
+        # log(f"loss: {loss.item()}, grad_fn: {loss.grad_fn}")
         
         # 检查 loss 是否为 nan 或 inf
-        log(f"[Check] loss: nan={torch.isnan(loss).item()}, inf={torch.isinf(loss).item()}, value={loss.item()}")
+        # log(f"[Check] loss: nan={torch.isnan(loss).item()}, inf={torch.isinf(loss).item()}, value={loss.item()}")
 
         
-        log(f"[OmniTrainingModule] training_step -> loss: {loss.item()}")
+        log(f"[OmniTrainingModule] training_step -> loss: {loss.item()}, video_path={batch['video_path']}")
         # 合并成一行，同时支持进度条和所有 loggers（包括 TensorBoard）
         self.log("train_loss", loss,
                 prog_bar=True,           # 进度条显示
                 on_step=True,            # 每步记录
                 on_epoch=True,           # 每轮记录
                 batch_size=len(batch['video_id']),  # batch size
-                logger=True)             # 发送到所有 loggers（TensorBoard/W&B等）
+                logger=True,             # 发送到所有 loggers（TensorBoard/W&B等）
+                sync_dist=True)          # 多卡时同步
         
         return loss
 
@@ -223,7 +222,7 @@ class OmniTrainingModule(pl.LightningModule):
         prompts = batch["prompt"]
         videos = batch["video"]
         audios = batch["audio"]
-        log(f"[OmniTrainingModule forward_preprocess] -> audio_path : {batch['audio_path']}, video_path: {batch['video_path']}")
+        log(f"[OmniTrainingModule forward_preprocess] start-> audio_path : {batch['audio_path']}, video_path: {batch['video_path']}")
         L = batch["L"][0]
         T = batch["T"][0]
 
@@ -238,14 +237,14 @@ class OmniTrainingModule(pl.LightningModule):
 
 
         # 提音频特征
-        log(f"[OmniTrainingModule forward_preprocess] -> audios dtype: {audios.dtype}, device: {audios.device}, shape: {audios.shape}")
-        log(f"[OmniTrainingModule forward_preprocess] -> self.audio_encoder dtype: {self.audio_encoder.dtype}, device: {self.audio_encoder.device}")
-        log(f"input_values: {audios}")
+        # log(f"[OmniTrainingModule forward_preprocess] -> audios dtype: {audios.dtype}, device: {audios.device}, shape: {audios.shape}")
+        # log(f"[OmniTrainingModule forward_preprocess] -> self.audio_encoder dtype: {self.audio_encoder.dtype}, device: {self.audio_encoder.device}")
+        # log(f"input_values: {audios}")
         hidden_states = self.audio_encoder(audios, seq_len=L, output_hidden_states=True)
         audio_embeddings = hidden_states.last_hidden_state
         for mid_hidden_states in hidden_states.hidden_states:
             audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
-        log(f"audio_embeddings {audio_embeddings}")    
+        # log(f"audio_embeddings {audio_embeddings}")    
         
         # TODO 构造图像条件image_emb，要check逻辑
         B, C, T, H, W = video_latents.shape
@@ -273,5 +272,5 @@ class OmniTrainingModule(pl.LightningModule):
         batch_inputs["noise"] = batch_inputs["noise"].detach().requires_grad_(True)
         
         log(f"[Timer] forward_preprocess 总耗时: {time.time() - time_start:.3f} 秒")
-        log(f"[OmniTrainingModule forward_preprocess] -> batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
+        log(f"[OmniTrainingModule forward_preprocess end] ->video_path={batch['video_path']}, batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
         return batch_inputs

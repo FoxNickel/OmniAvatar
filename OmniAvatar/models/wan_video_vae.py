@@ -517,10 +517,10 @@ class VideoVAE_(nn.Module):
         self.decoder = Decoder3d(dim, z_dim, dim_mult, num_res_blocks,
                                  attn_scales, self.temperal_upsample, dropout)
         
-        log(f"\n[VideoVAE_] encoder: {self.encoder}")
-        log(f"[VideoVAE_] conv1: {self.conv1}")
-        log(f"[VideoVAE_] conv2: {self.conv2}")
-        log(f"[VideoVAE_] decoder: {self.decoder}\n")
+        # log(f"\n[VideoVAE_] encoder: {self.encoder}")
+        # log(f"[VideoVAE_] conv1: {self.conv1}")
+        # log(f"[VideoVAE_] conv2: {self.conv2}")
+        # log(f"[VideoVAE_] decoder: {self.decoder}\n")
 
     def forward(self, x):
         mu, log_var = self.encode(x)

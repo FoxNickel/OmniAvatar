@@ -7,6 +7,9 @@ import numpy as np
 import torch.nn.functional as F
 from transformers import Wav2Vec2FeatureExtractor
 from OmniAvatar.utils.log import log, force_log
+import torch.distributed as dist
+import imageio
+from PIL import Image
 
 # 调用这个dataset之前，要先调用数据集下面的那个generate_metadata的脚本，生成metadata.csv
 class WanVideoDataset(torch.utils.data.Dataset):
@@ -33,9 +36,11 @@ class WanVideoDataset(torch.utils.data.Dataset):
         try:
             data = self.data[data_id % len(self.data)].copy()
             args = self.args
+            rank = dist.get_rank() if dist.is_initialized() else 0
+            log(f"[Dataset][rank={rank}] __getitem__ ENTER data_id={data_id} video_path={data['video_path']}")
             
             # TODO 帧数太低，要改高，但要先解决显存过大问题
-            max_frame = 25
+            max_frame = 75
             max_frame = max_frame // 4 * 4 + 1 if max_frame % 4 != 0 else max_frame - 3  # 对齐inference的调整
             # TODO 这里360经过vae之后，会变成360/8=45，然后进到模型之后，经过3d卷积的时候，会变成22，导致最后输出的时候跟原图h不一致。
             # 而inference的时候，h是400，是没问题的。这里要怎么处理？把原视频resize到400x640？还是说后面处理的时候补一下？
@@ -47,42 +52,51 @@ class WanVideoDataset(torch.utils.data.Dataset):
             audio_path = data["audio_path"]
             
             # 处理视频
-            video, _, info = torchvision.io.read_video(video_path, pts_unit="sec")
-            origin_video_fps = info["video_fps"]
-            video = video.float() / 255.0
-            video = video.permute(0, 3, 1, 2)  # [T, C, H, W]
-            video = F.interpolate(video, size=(target_h, target_w), mode="bilinear", align_corners=False)
-            video = video.permute(1, 0, 2, 3)  # [C, T, H, W]
-            origin_video_len = video.shape[1]
-            total_dur = origin_video_len / max(origin_video_fps, 1e-6)
-            
-            audio, sr = librosa.load(audio_path, sr=args.sample_rate)
+            reader = imageio.get_reader(video_path, 'ffmpeg')
+            meta = reader.get_meta_data()
+            origin_video_fps = meta['fps']
+            total_dur = meta['duration']
+            origin_video_len = origin_video_fps * total_dur
             
             L = max_frame
             T = (L + 3) // 4
             D = L / float(target_fps)
-
+            
             # 短于max的直接丢，不能扩展，扩展会让模型学错东西
             # TODO 直接在数据预处理的时候，丢掉时长小于目标帧数的视频。不能在dataset里面处理
+            if total_dur <= D:
+                print(f"[WanVideoDataset __getitem__ error] -> Video shorter than max_frame, drop this video")
+                reader.close()
+                return None
+
             # 频fps不一样，导致每一帧对应多少音频采样点不一样，这里要统一。方案是：统一时间轴
             # 16000/25=640， 16000/30=533.33， 16000/24=666.67
             # 只处理音频也不行，用在线统一时间轴
             # 即：视频按原始fps读取，然后在一个统一时间网格上取帧，如果原始fps低于target_fps，就抽帧；如果高于target_fps，就复帧（最近邻），不做光流插值
             # 音频直接取对应时间窗，然后统一长度到 L * round(sr/target_fps)
-            if origin_video_len <= max_frame:
-                log(f"[WanVideoDataset __getitem__] -> Video shorter than max_frame, drop this video")
-                return None
             
             # 起始时间：val 固定 0，train 随机
             start_sec = 0.0 if self.validation else float(np.random.uniform(0, total_dur - D))
-
             # 在统一时间网格上取 L 帧：抽/复帧（最近邻），不做光流插值
             t_grid = start_sec + (np.arange(L) / float(target_fps))              # [L] 秒
             frame_idxs = np.round(t_grid * origin_video_fps).astype(np.int64)    # [L]
             frame_idxs = np.clip(frame_idxs, 0, origin_video_len - 1)
-            video_clip = video[:, frame_idxs, :, :]                              # [C,L,H,W]
+            
+            # 只读取目标帧
+            frames = []
+            for idx in frame_idxs:
+                idx = int(idx)
+                frame = reader.get_data(idx)  # ndarray [H, W, C], uint8
+                frame = Image.fromarray(frame)
+                frame = frame.resize((target_w, target_h), Image.BILINEAR)
+                frame = np.asarray(frame).astype(np.float32) / 255.0  # [H, W, C], float32
+                frame = torch.from_numpy(frame).permute(2, 0, 1)      # [C, H, W]
+                frames.append(frame)
+            reader.close()
+            video_clip = torch.stack(frames, dim=1)  # [C, L, H, W]
 
             # 同一时间窗切音频，并固定长度到 L * round(sr/target_fps)
+            audio, sr = librosa.load(audio_path, sr=args.sample_rate)
             a0 = int(round(start_sec * sr))
             a1 = a0 + int(round(D * sr))
             audio_clip = audio[a0:a1]
@@ -103,10 +117,11 @@ class WanVideoDataset(torch.utils.data.Dataset):
             data['L'] = L
             data['T'] = T
             
+            log(f"[Dataset][rank={rank}] __getitem__ EXIT data_id={data_id}, video_path={data['video_path']}, data[video].shape={data['video'].shape}, data[audio].shape={data['audio'].shape}")
             return data
         except Exception as e:
             # 捕获所有可能的异常，记录错误并尝试下一个样本
-            force_log(f"[WanVideoDataset __getitem__] -> Error processing item {video_path}: {str(e)}")
+            force_log(f"[WanVideoDataset __getitem__ error] -> Error processing item {video_path}: {str(e)}")
             return None
     
     def __len__(self):

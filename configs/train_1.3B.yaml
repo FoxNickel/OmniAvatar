@@ -45,7 +45,7 @@ fps: 25
 batch_size: 1
 # nodes代表分布式训练的节点数，devices代表每个节点上的GPU数量
 nodes: 1
-devices: 4
+devices: 2
 num_train_epochs: 1
 mode: train
 checkpoint_path: ""
@@ -55,3 +55,4 @@ debug: False
 debug_data_len: 100
 use_checkpoint: True
 train_log: True
+ckpt_log: False

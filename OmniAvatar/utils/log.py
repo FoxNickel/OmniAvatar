@@ -19,3 +19,9 @@ def force_log(str):
     with open(f"train_log_{timestamp}.txt", "a") as f:
         f.write(str + "\n")
     print(str)
+
+def ckpt_log(str):
+    if args.ckpt_log:
+        with open(f"train_log_{timestamp}.txt", "a") as f:
+            f.write(str + "\n")
+        print(str)

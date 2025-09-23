@@ -381,7 +381,7 @@ class WanInferencePipeline(nn.Module):
             image = (frames[:, -fixed_frame:].clip(0, 1) * 2 - 1).permute(0, 2, 1, 3, 4).contiguous()
             # 保存中间结果
             if dist.get_rank() == 0:
-                self.save_intermediate_frames(frames, t+1, args.fps, "outputs")
+                self.save_intermediate_frames(frames, t+1, args.fps, "outputs/intermediate_frame")
             if t == 0:
                 video.append(frames)
             else:

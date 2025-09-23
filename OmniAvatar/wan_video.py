@@ -186,7 +186,7 @@ class WanVideoPipeline(BasePipeline):
         return {}
 
     def encode_video(self, input_video, tiled=True, tile_size=(34, 34), tile_stride=(18, 16)): # input_video[b,c,f,h,w]
-        log(f"[WanVideoPipeline] encode_video -> input_video device: {input_video.device}, dtype: {input_video.dtype}")
+        # log(f"[WanVideoPipeline] encode_video -> input_video device: {input_video.device}, dtype: {input_video.dtype}")
         latents = self.vae.encode(input_video, device=self.device, tiled=tiled, tile_size=tile_size, tile_stride=tile_stride)
         return latents
 
@@ -198,8 +198,8 @@ class WanVideoPipeline(BasePipeline):
         return {"use_unified_sequence_parallel": self.use_unified_sequence_parallel}
 
     def training_loss(self, **inputs):
-        log(f"[WanVideoPipeline] training_loss -> input keys: {inputs.keys()}, self.torch_dtype = {self.torch_dtype}, self.device = {self.device}")
-        log(f"[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: {self.scheduler.num_train_timesteps}, len(timesteps): {len(self.scheduler.timesteps)}, timesteps: {self.scheduler.timesteps}")
+        # log(f"[WanVideoPipeline] training_loss -> input keys: {inputs.keys()}, self.torch_dtype = {self.torch_dtype}, self.device = {self.device}")
+        # log(f"[WanVideoPipeline] training_loss -> self.scheduler.num_train_timesteps: {self.scheduler.num_train_timesteps}, len(timesteps): {len(self.scheduler.timesteps)}, timesteps: {self.scheduler.timesteps}")
         self.scheduler.set_timesteps(training=True)
         max_timestep_boundary = int(inputs.get("max_timestep_boundary", 1) * len(self.scheduler.timesteps))
         min_timestep_boundary = int(inputs.get("min_timestep_boundary", 0) * len(self.scheduler.timesteps))
@@ -220,7 +220,7 @@ class WanVideoPipeline(BasePipeline):
         return loss
 
     def model_fn(self, timestep: torch.Tensor = None, **inputs):
-        log(f"[WanVideoPipeline] model_fn -> input keys: {inputs.keys()}")
+        # log(f"[WanVideoPipeline] model_fn -> input keys: {inputs.keys()}")
         latents = inputs.get("latents", None)
         prompt = inputs.get("prompt", "")
         image_emb = inputs.get("image_emb", {})

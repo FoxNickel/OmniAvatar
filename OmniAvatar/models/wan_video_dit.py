@@ -9,7 +9,7 @@ from typing import Tuple, Optional
 from einops import rearrange
 from ..utils.io_utils import hash_state_dict_keys
 from .audio_pack import AudioPack
-from OmniAvatar.utils.log import log
+from OmniAvatar.utils.log import log, ckpt_log
 from xfuser.core.distributed import (get_sequence_parallel_rank,
                                      get_sequence_parallel_world_size,
                                      get_sp_group)
@@ -112,8 +112,8 @@ class RMSNorm(nn.Module):
         return x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + self.eps)
 
     def forward(self, x):
-        log(f"[RMSNorm forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[RMSNorm forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, x)
         else:
             return self._forward(x)
@@ -129,8 +129,8 @@ class AttentionModule(nn.Module):
         self.num_heads = num_heads
     
     def forward(self, q, k, v):
-        log(f"[AttentionModule forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[AttentionModule forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, q, k, v)
         else:
             return self._forward(q, k, v)
@@ -157,8 +157,8 @@ class SelfAttention(nn.Module):
         self.attn = AttentionModule(self.num_heads)
 
     def forward(self, x, freqs):
-        log(f"[SelfAttention forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[SelfAttention forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, x, freqs)
         else:
             return self._forward(x, freqs)
@@ -195,8 +195,8 @@ class CrossAttention(nn.Module):
         self.attn = AttentionModule(self.num_heads)
 
     def forward(self, x: torch.Tensor, y: torch.Tensor):
-        log(f"[CrossAttention forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[CrossAttention forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, x, y)
         else:
             return self._forward(x, y)
@@ -224,8 +224,8 @@ class GateModule(nn.Module):
         super().__init__()
         
     def forward(self, x, gate, residual):
-        log(f"[GateModule forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[GateModule forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, x, gate, residual)
         else:
             return self._forward(x, gate, residual)
@@ -257,8 +257,8 @@ class DiTBlock(nn.Module):
         self.gate = GateModule()
 
     def forward(self, x, context, t_mod, freqs):
-        log(f"[DiTBlock forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[DiTBlock forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, x, context, t_mod, freqs)
         else:
             return self._forward(x, context, t_mod, freqs)
@@ -292,8 +292,8 @@ class MLP(torch.nn.Module):
         )
         
     def forward(self, x):
-        log(f"[MLP forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[MLP forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, x)
         else:
             return self._forward(x)
@@ -312,8 +312,8 @@ class Head(nn.Module):
         self.modulation = nn.Parameter(torch.randn(1, 2, dim) / dim**0.5)
 
     def forward(self, x, t_mod):
-        log(f"[Head forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[Head forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, x, t_mod)
         else:
             return self._forward(x, t_mod)
@@ -449,8 +449,8 @@ class WanModel(torch.nn.Module):
             tea_cache = None,                     # 分布式推理缓存
             **kwargs,
             ):
-        log(f"[WanModel forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
-        if args.use_checkpoint and self.training:
+        ckpt_log(f"[WanModel forward] use_checkpoint: {args.use_checkpoint}, training: {self.training}")
+        if args.use_checkpoint:
             return checkpoint(self._forward, x, timestep, context, clip_feature, y, use_gradient_checkpointing, audio_emb, use_gradient_checkpointing_offload, tea_cache, **kwargs)
         else:
             return self._forward(x, timestep, context, clip_feature, y, use_gradient_checkpointing, audio_emb, use_gradient_checkpointing_offload, tea_cache, **kwargs)
@@ -467,7 +467,7 @@ class WanModel(torch.nn.Module):
             tea_cache = None,                     # 分布式推理缓存
             **kwargs,
             ):
-        log(f"[WanModel] Forward pass with x shape: {x.shape}, timestep: {timestep.shape}, context shape: {context.shape}, y shape: {y.shape if y is not None else 'None'}, audio_emb shape: {audio_emb.shape if audio_emb is not None else 'None'}")
+        # log(f"[WanModel] Forward pass with x shape: {x.shape}, timestep: {timestep.shape}, context shape: {context.shape}, y shape: {y.shape if y is not None else 'None'}, audio_emb shape: {audio_emb.shape if audio_emb is not None else 'None'}")
         # 1. 时间步嵌入与调制参数
         t = self.time_embedding(
             sinusoidal_embedding_1d(self.freq_dim, timestep))
@@ -490,9 +490,9 @@ class WanModel(torch.nn.Module):
         # 5. 拼接图片条件（如mask），做patch embedding
         # 训练时，x 是视频的 latent，y 是图片条件（如图片 latent + mask），拼接后送入 patch embedding 和 patchify
         x = torch.cat([x, y], dim=1)  # 拼接图片条件, x=[1,33,3,45,80]
-        log(f"[WanModel] x shape: {x.shape}")
+        # log(f"[WanModel] x shape: {x.shape}")
         x = self.patch_embedding(x)   # 3D卷积分块升维x=[1,1536,3,22,40], 应该就是这变成22了，应该是45才对
-        log(f"[WanModel] After patch embedding, x shape: {x.shape}")
+        # log(f"[WanModel] After patch embedding, x shape: {x.shape}")
         x, (f, h, w) = self.patchify(x)  # 展平成patch序列x=[1,2640,1536], (f,h,w)=(3,22,40)
 
         # 6. 计算RoPE三维位置编码
@@ -546,9 +546,9 @@ class WanModel(torch.nn.Module):
                         x = audio_cond_tmp + x # 音频条件加到主干特征
 
                 # 11. 梯度检查点（节省显存，训练时用）
-                log(f"[WanModel] self.training: {self.training}, use_gradient_checkpointing: {use_gradient_checkpointing}, use_gradient_checkpointing_offload: {use_gradient_checkpointing_offload}, layer_i: {layer_i}")
+                # log(f"[WanModel] self.training: {self.training}, use_gradient_checkpointing: {use_gradient_checkpointing}, use_gradient_checkpointing_offload: {use_gradient_checkpointing_offload}, layer_i: {layer_i}")
                 if self.training and use_gradient_checkpointing:
-                    log(f"[WanModel] Using gradient checkpointing1")
+                    # log(f"[WanModel] Using gradient checkpointing1")
                     if use_gradient_checkpointing_offload:
                         with torch.autograd.graph.save_on_cpu():
                             x = checkpoint(
@@ -557,14 +557,14 @@ class WanModel(torch.nn.Module):
                                 # use_reentrant=False,
                             )
                     else:
-                        log(f"[WanModel] Using gradient checkpointing2 at block {layer_i}")
+                        # log(f"[WanModel] Using gradient checkpointing2 at block {layer_i}")
                         x = checkpoint(
                             create_custom_forward(block),
                             x, context, t_mod, freqs,
                             # use_reentrant=False,
                         )
                 else:
-                    log(f"[WanModel] Normal forward at block {layer_i}")
+                    # log(f"[WanModel] Normal forward at block {layer_i}")
                     x = block(x, context, t_mod, freqs)
             # 12. 分布式缓存同步
             if tea_cache is not None:
