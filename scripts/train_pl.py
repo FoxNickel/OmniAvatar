@@ -15,7 +15,7 @@ from OmniAvatar.datasets.datasets import WanVideoDataset
 from OmniAvatar.models.training_module import OmniTrainingModule
 import setproctitle
 from omegaconf import OmegaConf
-from OmniAvatar.utils.log import log
+from OmniAvatar.utils.log import log, force_log
 from pytorch_lightning.loggers import TensorBoardLogger
 tb_logger = TensorBoardLogger("logs/", name="omni_avatar")
 
@@ -110,7 +110,11 @@ def main():
     log("===================================================================================")
     
     if args.mode == "train":
-        log(f"[OmniTrainingModule]: start training with config: {config}")
+        force_log(f"[OmniTrainingModule]: start training with config: {config}")
+        log(f"[OmniTrainingModule]: 训练集样本数: {len(WanVideoDataset(args))}")
+        log(f"[OmniTrainingModule]: 验证集样本数: {len(WanVideoDataset(args, validation=True))}")
+        log(f"[OmniTrainingModule]: 训练集 batch 数: {len(train_dataloader)}")
+        log(f"[OmniTrainingModule]: 验证集 batch 数: {len(test_dataloader)}")
         trainer.fit(
             model=trainer_model,
             train_dataloaders=train_dataloader,
