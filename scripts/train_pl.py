@@ -75,7 +75,7 @@ def main():
         max_epochs=config.num_train_epochs,
         strategy=strategy,
         sync_batchnorm=True, # 将 BatchNorm 转为跨 GPU 同步（SyncBatchNorm），使多卡时用全局统计量。多卡小 batch 有帮助，但会增加通信开销；若模型里几乎没有 BN 或已用 LN，可设 False。
-        val_check_interval=100,
+        val_check_interval=500 if args.debug == False else 5,
         # check_val_every_n_epoch   =     5,
     )
 
@@ -85,7 +85,7 @@ def main():
             WanVideoDataset(args),
             shuffle=False,
             batch_size=config.batch_size,
-            num_workers=10,
+            num_workers=6,
             timeout=60,
             drop_last=True
         )
@@ -93,6 +93,7 @@ def main():
             WanVideoDataset(args, validation=True),
             batch_size=config.batch_size,
             num_workers=6,
+            timeout=60,
             drop_last=True
         )
 
@@ -101,7 +102,7 @@ def main():
 
     # 设置可训练的模块
     # audio_encoder开train会导致音频nan，开dit看看是不是因为模块开少了导致loss为0，不对，应该是因为梯度没有导致loss=0
-    trainer_model.freeze_except(["lora", "dit", "audio_proj", "audio_cond_projs"])
+    trainer_model.freeze_except(["lora", "audio_proj", "audio_cond_projs"])
 
     log(f"===================[train_pl.py]-main-] model summary================================")
     for name, p in trainer_model.named_parameters():
@@ -113,7 +114,7 @@ def main():
         trainer.fit(
             model=trainer_model,
             train_dataloaders=train_dataloader,
-            # val_dataloaders=test_dataloader,
+            val_dataloaders=test_dataloader,
             ckpt_path=None if not os.path.exists(args.checkpoint_path) else args.checkpoint_path,
         )
 

@@ -8,8 +8,9 @@ from OmniAvatar.models.model_manager import ModelManager
 from OmniAvatar.utils.io_utils import load_state_dict
 from OmniAvatar.wan_video import WanVideoPipeline
 from deepspeed.ops.adam import DeepSpeedCPUAdam
-from OmniAvatar.utils.log import log
+from OmniAvatar.utils.log import log, force_log
 import torch.distributed as dist
+from OmniAvatar.utils.io_utils import save_video_as_grid_and_mp4
 
 
 class OmniTrainingModule(pl.LightningModule):
@@ -153,17 +154,48 @@ class OmniTrainingModule(pl.LightningModule):
     # def forward(self, data):
     #     return self.pipe.forward(data)
 
-    def validation_step(self, *args, **kwargs):
-        # log(f"[OmniTrainingModule] validation_step, args: {args}, kwargs keys: {kwargs.keys()}")
-        return super().validation_step(*args, **kwargs)
+    def validation_step(self, batch, batch_idx):
+        video_path = batch['video_path']
+        log(f"[validation_step] batch_idx={batch_idx}, video_path={video_path}, current_epoch={self.current_epoch}")
+        inputs = self.forward_preprocess(batch)
+        val_loss = self.pipe.training_loss(**inputs)
+        self.log("val_loss", val_loss, prog_bar=True, on_step=False, on_epoch=True, sync_dist=True)
+        
+        if batch_idx == 0:
+            log(f"[OmniTrainingModule] validation_step -> sample video_path={video_path}, current_epoch={self.current_epoch}")
+            # 只在主进程做
+            if dist.get_rank() == 0:
+                self.sample_video(inputs, video_path=video_path)
+
+        return val_loss
+    
+    def sample_video(self, inputs, video_path=None):
+        args = self.args
+        img_lat = inputs["input_latents"][0:1]
+        prompt = inputs["prompt"][0]
+        image_emb = {k: v[0:1] for k, v in inputs["image_emb"].items()}
+        audio_emb = {"audio_emb": inputs["audio_emb"][0:1]}
+        inf_steps = 25
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        output_dir = f"{self.args.savedir}/samples_{video_path[0].split('/')[-2]}_{timestamp}"
+        log(f"[OmniTrainingModule] sample_video -> output_dir: {output_dir}, video_path: {video_path[0]}, prompt: {prompt}, latents shape: {img_lat.shape}, image_emb shape: {image_emb['y'].shape}, audio_emb shape: {audio_emb['audio_emb'].shape}")
+        frames, _ = self.pipe.log_video(img_lat, prompt, 
+                                           image_emb=image_emb, 
+                                           audio_emb=audio_emb,
+                                           num_inference_steps=inf_steps)
+        log(f"[OmniTrainingModule] sample_video -> frames.shape={frames.shape}")
+        if frames.dim() == 4:
+            frames = frames.unsqueeze(0)  # [1, T, C, H, W]
+        save_video_as_grid_and_mp4(frames, output_dir, args.fps)
+        
     
     def training_step(self, batch, batch_idx):
         rank = dist.get_rank() if dist.is_initialized() else 0
         log(f"[training_step][rank={rank}] batch_idx={batch_idx} video_path={batch['video_path']}")
         # 打印 batch 主要字段 shape
-        for k, v in batch.items():
-            if isinstance(v, torch.Tensor):
-                log(f"[Rank {rank}] batch[{k}] shape: {v.shape}, dtype: {v.dtype}, device: {v.device}")
+        # for k, v in batch.items():
+        #     if isinstance(v, torch.Tensor):
+        #         log(f"[Rank {rank}] batch[{k}] shape: {v.shape}, dtype: {v.dtype}, device: {v.device}")
 
         inputs = self.forward_preprocess(batch)
         
@@ -215,7 +247,6 @@ class OmniTrainingModule(pl.LightningModule):
     # TODO 看lora是怎么弄的
     # TODO 训练的时候，视频大小是不是要跟之前的模型保持一致
     # TODO 一定要搞清楚，模型每一步在干啥.
-    # TODO 先加checkpointing
     def forward_preprocess(self, batch):
         time_start = time.time()
 

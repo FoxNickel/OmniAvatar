@@ -17,8 +17,7 @@ class WanVideoDataset(torch.utils.data.Dataset):
         self.args = args
         self.validation = validation
         dataset_base_path = args.dataset_base_path
-        metadata_path = os.path.join(dataset_base_path, "metadata.csv")
-        # metadata_path = "/home/huanglingyu/data/vgg/OmniAvatar/configs/demo.csv"
+        metadata_path = os.path.join(dataset_base_path, "metadata.csv") if not args.debug else "/home/huanglingyu/data/vgg/OmniAvatar/configs/demo.csv"
         self.wav_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
             args.wav2vec_path
         )
@@ -28,7 +27,6 @@ class WanVideoDataset(torch.utils.data.Dataset):
         data_len = min(args.debug_data_len, len(metadata)) if args.debug else len(metadata)
         if validation:
             self.data = [metadata.iloc[i].to_dict() for i in range(data_len-10, data_len)]
-            # self.data = [metadata.iloc[i].to_dict() for i in range(data_len)]
         else:
             self.data = [metadata.iloc[i].to_dict() for i in range(data_len)]
     
@@ -39,8 +37,7 @@ class WanVideoDataset(torch.utils.data.Dataset):
             rank = dist.get_rank() if dist.is_initialized() else 0
             log(f"[Dataset][rank={rank}] __getitem__ ENTER data_id={data_id} video_path={data['video_path']}")
             
-            # TODO 帧数太低，要改高，但要先解决显存过大问题
-            max_frame = 75
+            max_frame = 100
             max_frame = max_frame // 4 * 4 + 1 if max_frame % 4 != 0 else max_frame - 3  # 对齐inference的调整
             # TODO 这里360经过vae之后，会变成360/8=45，然后进到模型之后，经过3d卷积的时候，会变成22，导致最后输出的时候跟原图h不一致。
             # 而inference的时候，h是400，是没问题的。这里要怎么处理？把原视频resize到400x640？还是说后面处理的时候补一下？
