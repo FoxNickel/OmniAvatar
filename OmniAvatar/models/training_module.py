@@ -113,6 +113,7 @@ class OmniTrainingModule(pl.LightningModule):
         # 模型初始化的时候，device是cpu，等到fit开始的时候，Lightning会自动分配设备
         log(f"[OmniTrainingModule] on_fit_start -> device: {self.device}, param device: {next(self.parameters()).device}")
         self.pipe.device = self.device
+        self.pipe.load_models_to_device(["vae"]) # VAE比较大，训练时也会用到，放到GPU上，只在fit开始时加载一次
         # 打印模块参数统计
         # self.print_module_param_report(top_n=50)
     
@@ -248,7 +249,7 @@ class OmniTrainingModule(pl.LightningModule):
     # TODO 训练的时候，视频大小是不是要跟之前的模型保持一致
     # TODO 一定要搞清楚，模型每一步在干啥.
     def forward_preprocess(self, batch):
-        time_start = time.time()
+        # time_start = time.time()
 
         prompts = batch["prompt"]
         videos = batch["video"]
@@ -258,13 +259,14 @@ class OmniTrainingModule(pl.LightningModule):
         T = batch["T"][0]
 
         # 视频过vae
-        t_vae_start = time.time()
-        self.pipe.load_models_to_device(["vae"])
+        # t_vae_start = time.time()
+        # self.pipe.load_models_to_device(["vae"])
         # videos=[1, 3, 9, 360, 640]. 这里过vae之后的video_latents在cpu上，因为vae处理逻辑把数据移到cpu了。所以to一下device
+        videos = videos.to(self.device, non_blocking=True).to(torch.float16).div_(255.0)
         video_latents = self.pipe.encode_video(videos).to(self.device)  # [B, latent_dim, T, H', W']
         # video_latents=[1, 16, 3, 45, 80]
-        t_vae_end = time.time()
-        log(f"[Timer] VAE编码耗时: {t_vae_end - t_vae_start:.3f} 秒")
+        # t_vae_end = time.time()
+        # log(f"[Timer] VAE编码耗时: {t_vae_end - t_vae_start:.3f} 秒")
 
 
         # 提音频特征
@@ -302,6 +304,6 @@ class OmniTrainingModule(pl.LightningModule):
         batch_inputs["input_latents"] = batch_inputs["input_latents"].detach().requires_grad_(True)
         batch_inputs["noise"] = batch_inputs["noise"].detach().requires_grad_(True)
         
-        log(f"[Timer] forward_preprocess 总耗时: {time.time() - time_start:.3f} 秒")
+        # log(f"[Timer] forward_preprocess 总耗时: {time.time() - time_start:.3f} 秒")
         log(f"[OmniTrainingModule forward_preprocess end] ->video_path={batch['video_path']}, batch_inputs ready, input_latents shape: {batch_inputs['input_latents'].shape}, audio_emb shape: {batch_inputs['audio_emb'].shape if batch_inputs['audio_emb'] is not None else 'None'}, noise shape: {batch_inputs['noise'].shape}")
         return batch_inputs

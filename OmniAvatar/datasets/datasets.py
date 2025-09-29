@@ -10,6 +10,8 @@ from OmniAvatar.utils.log import log, force_log
 import torch.distributed as dist
 import imageio
 from PIL import Image
+import soundfile as sf
+import cv2
 
 # 调用这个dataset之前，要先调用数据集下面的那个generate_metadata的脚本，生成metadata.csv
 class WanVideoDataset(torch.utils.data.Dataset):
@@ -82,23 +84,31 @@ class WanVideoDataset(torch.utils.data.Dataset):
             # 只读取目标帧
             frames = []
             for idx in frame_idxs:
-                idx = int(idx)
-                frame = reader.get_data(idx)  # ndarray [H, W, C], uint8
-                frame = Image.fromarray(frame)
-                frame = frame.resize((target_w, target_h), Image.BILINEAR)
-                frame = np.asarray(frame).astype(np.float32) / 255.0  # [H, W, C], float32
-                frame = torch.from_numpy(frame).permute(2, 0, 1)      # [C, H, W]
+                frame = reader.get_data(int(idx))                 # [H, W, C], uint8
+                frame = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                frame = torch.from_numpy(frame)                   # uint8 [H, W, C]
+                frame = frame.permute(2, 0, 1).contiguous()       # [C, H, W]
                 frames.append(frame)
             reader.close()
-            video_clip = torch.stack(frames, dim=1)  # [C, L, H, W]
+            video_clip = torch.stack(frames, dim=1)               # uint8 [C, L, H, W]
 
             # 同一时间窗切音频，并固定长度到 L * round(sr/target_fps)
-            audio, sr = librosa.load(audio_path, sr=args.sample_rate)
-            a0 = int(round(start_sec * sr))
-            a1 = a0 + int(round(D * sr))
-            audio_clip = audio[a0:a1]
+            try:
+                with sf.SoundFile(audio_path, 'r') as f:
+                    src_sr = f.samplerate
+                    a0 = int(round(start_sec * src_sr))
+                    need = int(round(D * src_sr))
+                    f.seek(max(0, a0))
+                    audio_clip = f.read(frames=need, dtype='float32', always_2d=False)
+                sr = src_sr
+                if sr != args.sample_rate:
+                    audio_clip = librosa.resample(audio_clip, orig_sr=sr, target_sr=args.sample_rate, res_type="kaiser_fast")
+                    sr = args.sample_rate
+            except Exception:
+                audio_clip, sr = librosa.load(audio_path, sr=args.sample_rate, offset=start_sec, duration=D, mono=True)
 
-            spp_target = int(round(sr / float(target_fps)))                      # 每帧样本数（统一）
+
+            spp_target = int(round(sr / float(target_fps)))
             target_audio_len = L * spp_target
             if audio_clip.shape[0] < target_audio_len:
                 audio_clip = np.pad(audio_clip, (0, target_audio_len - audio_clip.shape[0]))

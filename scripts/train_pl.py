@@ -18,6 +18,7 @@ from omegaconf import OmegaConf
 from OmniAvatar.utils.log import log, force_log
 from pytorch_lightning.loggers import TensorBoardLogger
 tb_logger = TensorBoardLogger("logs/", name="omni_avatar")
+from pytorch_lightning.profilers import AdvancedProfiler, PyTorchProfiler
 
 
 def get_nested_attr(obj, attr_string):
@@ -58,6 +59,11 @@ def main():
 
     # benchmark=True。等价于 torch.backends.cudnn.benchmark=True。对于输入尺寸固定/少变的任务可加速；若每步尺寸变化大，可能反而慢或占用更多缓存。
     
+    adv_profiler = AdvancedProfiler(
+        dirpath=os.path.join(config.savedir, "profiler"),
+        filename="advanced_profiler",
+    )
+    
     trainer = pl.Trainer(
         logger=tb_logger,
         default_root_dir=config.savedir,
@@ -70,12 +76,14 @@ def main():
         num_nodes=args.nodes,
         devices=args.devices,
         # gradient_clip_val         =     config.max_grad_norm,
-        log_every_n_steps=1,
+        log_every_n_steps=5,
         precision=args.dtype,
         max_epochs=config.num_train_epochs,
         strategy=strategy,
-        sync_batchnorm=True, # 将 BatchNorm 转为跨 GPU 同步（SyncBatchNorm），使多卡时用全局统计量。多卡小 batch 有帮助，但会增加通信开销；若模型里几乎没有 BN 或已用 LN，可设 False。
+        # sync_batchnorm=True, # 将 BatchNorm 转为跨 GPU 同步（SyncBatchNorm），使多卡时用全局统计量。多卡小 batch 有帮助，但会增加通信开销；若模型里几乎没有 BN 或已用 LN，可设 False。
         val_check_interval=500 if args.debug == False else 5,
+        max_steps=5, # 跑五步看profile
+        profiler=adv_profiler,
         # check_val_every_n_epoch   =     5,
     )
 
@@ -86,13 +94,16 @@ def main():
             shuffle=False,
             batch_size=config.batch_size,
             num_workers=6,
+            prefetch_factor=1,
+            # persistent_workers=True,
+            pin_memory=False,
             timeout=60,
             drop_last=True
         )
         test_dataloader = DataLoader(
             WanVideoDataset(args, validation=True),
             batch_size=config.batch_size,
-            num_workers=6,
+            num_workers=0,
             timeout=60,
             drop_last=True
         )

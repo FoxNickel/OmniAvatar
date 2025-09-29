@@ -42,10 +42,10 @@ dataset_base_path: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1
 name: train_1.3B
 savedir: /mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs
 fps: 25
-batch_size: 6 # 最高可以开6, 8会OOM, 7不知道行不行
+batch_size: 5 # 最高可以开6, 8会OOM, 7不知道行不行
 # nodes代表分布式训练的节点数，devices代表每个节点上的GPU数量
 nodes: 1
-devices: 2
+devices: 8
 num_train_epochs: 1
 mode: train
 checkpoint_path: ""
