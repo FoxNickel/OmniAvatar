@@ -114,7 +114,7 @@ def main():
 
     # 设置可训练的模块
     # audio_encoder开train会导致音频nan，开dit看看是不是因为模块开少了导致loss为0，不对，应该是因为梯度没有导致loss=0
-    trainer_model.freeze_except(["lora", "audio_proj", "audio_cond_projs"])
+    trainer_model.freeze_except(["lora", "audio_proj", "audio_cond_projs", "audio_encoder"])
 
     log(f"===================[train_pl.py]-main-] model summary================================")
     for name, p in trainer_model.named_parameters():
