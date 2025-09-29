@@ -11,6 +11,7 @@ from deepspeed.ops.adam import DeepSpeedCPUAdam
 from OmniAvatar.utils.log import log, force_log
 import torch.distributed as dist
 from OmniAvatar.utils.io_utils import save_video_as_grid_and_mp4
+import torch.optim as optim
 
 
 class OmniTrainingModule(pl.LightningModule):
@@ -149,7 +150,8 @@ class OmniTrainingModule(pl.LightningModule):
     def configure_optimizers(self):
         log(f"[OmniTrainingModule] configure_optimizers")
         # 这里应该是传所有需要训练的参数吧？没问题，传给Adam，但他只会更新没有freeze的
-        return DeepSpeedCPUAdam(self.parameters(), lr=float(self.args.lr))
+        # return DeepSpeedCPUAdam(self.parameters(), lr=float(self.args.lr))
+        return optim.AdamW(self.parameters(), lr=float(self.args.lr))
 
     # Lightning里面forward主要是inference用的
     # def forward(self, data):

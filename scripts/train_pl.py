@@ -45,14 +45,14 @@ def main():
         save_last=True,
         save_top_k=-1,
         verbose=True,
-        every_n_train_steps=100,
+        every_n_train_steps=1000,
         save_on_train_epoch_end=True,
     )
 
     # TODO load_full_weights的含义，以及怎么改False。省显存
     strategy = DeepSpeedStrategy(
         stage=2,
-        offload_optimizer=True,
+        offload_optimizer=False,
         load_full_weights=True,
         # cpu_checkpointing         =     True,
     )
@@ -82,8 +82,9 @@ def main():
         strategy=strategy,
         # sync_batchnorm=True, # 将 BatchNorm 转为跨 GPU 同步（SyncBatchNorm），使多卡时用全局统计量。多卡小 batch 有帮助，但会增加通信开销；若模型里几乎没有 BN 或已用 LN，可设 False。
         val_check_interval=500 if args.debug == False else 5,
-        max_steps=5, # 跑五步看profile
+        # max_steps=10, # 跑10步看profile
         profiler=adv_profiler,
+        accumulate_grad_batches=4,
         # check_val_every_n_epoch   =     5,
     )
 
