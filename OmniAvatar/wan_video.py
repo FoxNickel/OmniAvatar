@@ -234,7 +234,6 @@ class WanVideoPipeline(BasePipeline):
         # Extra input
         extra_input = self.prepare_extra_input(latents)
 
-        # TODO 没有tea cache
         log(f"[WanVideoPipeline] model_fn -> run dit...")
         noise_pred_posi = self.dit(
             latents,

@@ -62,7 +62,7 @@ class WanVideoDataset(torch.utils.data.Dataset):
             D = L / float(target_fps)
             
             # 短于max的直接丢，不能扩展，扩展会让模型学错东西
-            # TODO 直接在数据预处理的时候，丢掉时长小于目标帧数的视频。不能在dataset里面处理
+            # 直接在数据预处理的时候，丢掉时长小于目标帧数的视频。不能在dataset里面处理
             if total_dur <= D:
                 print(f"[WanVideoDataset __getitem__ error] -> Video shorter than max_frame, drop this video")
                 reader.close()
