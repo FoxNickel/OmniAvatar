@@ -19,6 +19,7 @@ from OmniAvatar.utils.log import log, force_log
 from pytorch_lightning.loggers import TensorBoardLogger
 tb_logger = TensorBoardLogger("logs/", name="omni_avatar")
 from pytorch_lightning.profilers import AdvancedProfiler, PyTorchProfiler
+import torch
 
 
 def get_nested_attr(obj, attr_string):
@@ -27,6 +28,15 @@ def get_nested_attr(obj, attr_string):
         obj = getattr(obj, attr)
     return obj
 
+# 自定义 collate_fn，用于过滤掉值为 None 的坏样本
+def collate_fn_skip_none(batch):
+    # 过滤掉所有 None 的样本
+    batch = [item for item in batch if item is not None]
+    # 如果过滤后 batch 为空，则返回 None 或一个空的 batch 结构
+    if not batch:
+        return None
+    # 使用 PyTorch 默认的 collate 函数处理过滤后的 batch
+    return torch.utils.data.dataloader.default_collate(batch)
 
 def main():
     pl.seed_everything(args.seed, workers=True)
@@ -81,7 +91,7 @@ def main():
         max_epochs=config.num_train_epochs,
         strategy=strategy,
         # sync_batchnorm=True, # 将 BatchNorm 转为跨 GPU 同步（SyncBatchNorm），使多卡时用全局统计量。多卡小 batch 有帮助，但会增加通信开销；若模型里几乎没有 BN 或已用 LN，可设 False。
-        val_check_interval=500 if args.debug == False else 5,
+        val_check_interval=200 if args.debug == False else 5,
         # max_steps=10, # 跑10步看profile
         profiler=adv_profiler,
         accumulate_grad_batches=4,
@@ -99,14 +109,16 @@ def main():
             # persistent_workers=True,
             pin_memory=False,
             timeout=60,
-            drop_last=True
+            drop_last=True,
+            collate_fn=collate_fn_skip_none
         )
         test_dataloader = DataLoader(
             WanVideoDataset(args, validation=True),
             batch_size=config.batch_size,
             num_workers=0,
             timeout=60,
-            drop_last=True
+            drop_last=True,
+            collate_fn=collate_fn_skip_none
         )
 
     # 加载要训练的模型

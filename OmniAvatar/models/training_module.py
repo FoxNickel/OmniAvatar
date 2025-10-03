@@ -29,7 +29,6 @@ class OmniTrainingModule(pl.LightningModule):
         self.audio_encoder = Wav2VecModel.from_pretrained(
             args.wav2vec_path, local_files_only=True
         ).to(device=self.device)
-        # self.audio_encoder.train() # TODO就是这句导致音频nan的
         self.audio_encoder.feature_extractor._freeze_parameters()
 
     def load_model(self):
@@ -246,8 +245,6 @@ class OmniTrainingModule(pl.LightningModule):
     # caption先统一使用原数据集里的caption，后续可以考虑使用翻译模型进行翻译。
     # TODO wave2vec看能不能用lora，看AudioPack、linear的权重大小
     # TODO 一定量之后validate一下（1k左右），效果在20k的时候看，batch_size=1
-    # TODO CFG
-    # TODO 看lora是怎么弄的
     # TODO 训练的时候，视频大小是不是要跟之前的模型保持一致
     # TODO 一定要搞清楚，模型每一步在干啥.
     def forward_preprocess(self, batch):

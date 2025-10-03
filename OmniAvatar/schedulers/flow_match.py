@@ -29,6 +29,7 @@ class FlowMatchScheduler():
         if self.reverse_sigmas:
             self.sigmas = 1 - self.sigmas
         self.timesteps = self.sigmas * self.num_train_timesteps
+        # TODO 这里可能要打开，让时间步符合高斯分布
         # if training: # 用正态分布给不同时间不赋予不同的权重
             # x = self.timesteps
             # y = torch.exp(-2 * ((x - num_inference_steps / 2) / num_inference_steps) ** 2)
@@ -74,6 +75,7 @@ class FlowMatchScheduler():
     
 
     def training_weight(self, timestep):
+        # 结合时间步长，给不同时间步赋予不同的权重。要结合set_timesteps里面注释掉的高斯加权部分
         timestep_id = torch.argmin((self.timesteps - timestep.to(self.timesteps.device)).abs())
         weights = self.linear_timesteps_weights[timestep_id]
         return weights
