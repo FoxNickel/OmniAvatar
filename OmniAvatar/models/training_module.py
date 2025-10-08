@@ -158,13 +158,13 @@ class OmniTrainingModule(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         video_path = batch['video_path']
-        log(f"[validation_step] batch_idx={batch_idx}, video_path={video_path}, current_epoch={self.current_epoch}")
+        force_log(f"[validation_step] batch_idx={batch_idx}, video_path={video_path}, current_epoch={self.current_epoch}")
         inputs = self.forward_preprocess(batch)
         val_loss = self.pipe.training_loss(**inputs)
-        self.log("val_loss", val_loss, prog_bar=True, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("val_loss", val_loss, prog_bar=True, on_step=True, on_epoch=True, logger=True, sync_dist=True)
         
         if batch_idx == 0:
-            log(f"[OmniTrainingModule] validation_step -> sample video_path={video_path}, current_epoch={self.current_epoch}")
+            force_log(f"[OmniTrainingModule] validation_step -> sample video_path={video_path}, current_epoch={self.current_epoch}")
             # 只在主进程做
             if dist.get_rank() == 0:
                 self.sample_video(inputs, video_path=video_path)

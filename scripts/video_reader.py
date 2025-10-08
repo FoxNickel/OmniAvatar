@@ -211,7 +211,7 @@ def read_video_by_torchvision(video_path, audio_path):
     print(f"[Dataset] __getitem__ EXIT data[video].shape={video_clip.shape}, data[audio].shape={audio_clip.shape}")
 
 if __name__ == "__main__":
-    video_path = "/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/rcDzsQuQboA_41/video.mp4"
-    audio_path = "/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_1_sv/rcDzsQuQboA_41/audio.wav"
+    video_path = "/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_3_sv/pv97fCP13SE_68/video.mp4"
+    audio_path = "/mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1/videos/Koala_36M_3_sv/pv97fCP13SE_68/audio.wav"
     read_video_by_imageio(video_path, audio_path)
     # read_video_by_torchvision(video_path, audio_path)

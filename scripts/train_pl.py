@@ -28,16 +28,6 @@ def get_nested_attr(obj, attr_string):
         obj = getattr(obj, attr)
     return obj
 
-# 自定义 collate_fn，用于过滤掉值为 None 的坏样本
-def collate_fn_skip_none(batch):
-    # 过滤掉所有 None 的样本
-    batch = [item for item in batch if item is not None]
-    # 如果过滤后 batch 为空，则返回 None 或一个空的 batch 结构
-    if not batch:
-        return None
-    # 使用 PyTorch 默认的 collate 函数处理过滤后的 batch
-    return torch.utils.data.dataloader.default_collate(batch)
-
 def main():
     pl.seed_everything(args.seed, workers=True)
     config = OmegaConf.load(args.config)
@@ -55,7 +45,7 @@ def main():
         save_last=True,
         save_top_k=-1,
         verbose=True,
-        every_n_train_steps=1000,
+        every_n_train_steps=500, # 保存ckpt的频率，every_n_train_steps*accumulate_grad_batches个step保存一次
         save_on_train_epoch_end=True,
     )
 
@@ -94,7 +84,7 @@ def main():
         val_check_interval=200 if args.debug == False else 5,
         # max_steps=10, # 跑10步看profile
         profiler=adv_profiler,
-        accumulate_grad_batches=4,
+        # accumulate_grad_batches=4,
         # check_val_every_n_epoch   =     5,
     )
 
@@ -102,23 +92,19 @@ def main():
     if args.mode == "train":
         train_dataloader = DataLoader(
             WanVideoDataset(args),
-            shuffle=False,
+            shuffle=True,
             batch_size=config.batch_size,
             num_workers=6,
             prefetch_factor=1,
-            # persistent_workers=True,
-            pin_memory=False,
+            persistent_workers=True,
+            pin_memory=True,
             timeout=60,
-            drop_last=True,
-            collate_fn=collate_fn_skip_none
         )
         test_dataloader = DataLoader(
             WanVideoDataset(args, validation=True),
             batch_size=config.batch_size,
-            num_workers=0,
+            num_workers=2,
             timeout=60,
-            drop_last=True,
-            collate_fn=collate_fn_skip_none
         )
 
     # 加载要训练的模型

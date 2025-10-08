@@ -9,46 +9,23 @@ vae_path: pretrained_models/Wan2.1-T2V-1.3B/Wan2.1_VAE.pth
 wav2vec_path: pretrained_models/wav2vec2-base-960h
 exp_path: pretrained_models/OmniAvatar-1.3B
 num_persistent_param_in_dit:  # You can set `num_persistent_param_in_dit` to a small number to reduce VRAM required. 
-
 reload_cfg: True
 sp_size: 1
 
-# 数据参数
-seed: 42
-image_sizes_720: [[400, 720], 
-             [720, 720], 
-             [720, 400]]
-image_sizes_1280: [
-             [720, 720], 
-             [528, 960],
-             [960, 528],
-             [720, 1280],
-             [1280, 720]]
-max_hw: 720 # 720: 480p; 1280: 720p
-max_tokens: 30000  
-seq_len: 200
-overlap_frame: 13 # must be 1 + 4*n
-guidance_scale: 4.5
-audio_scale: 
-num_steps: 50
-sample_rate: 16000
-negative_prompt: "Vivid color tones, background/camera moving quickly, screen switching, subtitles and special effects, mutation, overexposed, static, blurred details, subtitles, style, work, painting, image, still, overall grayish, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fingers merging, motionless image, chaotic background, three legs, crowded background with many people, walking backward"
-silence_duration_s: 0.3
-use_fsdp: False
-tea_cache_l1_thresh: 0 # 0.14 The larger this value is, the faster the speed, but the worse the visual quality. TODO check value
-
 # 训练参数
+seed: 42
 dataset_base_path: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1
 name: train_1.3B
 savedir: /mnt/hdd2/huanglingyu/vgg/OmniAvatar/outputs
 fps: 25
+sample_rate: 16000
 batch_size: 4 # 最高可以开6, 8会OOM, 7不知道行不行
 # nodes代表分布式训练的节点数，devices代表每个节点上的GPU数量
 nodes: 1
 devices: 4
 num_train_epochs: 1
 mode: train
-checkpoint_path: ""
+checkpoint_path: "/home/huanglingyu/data/vgg/OmniAvatar/outputs/train_1.3B/checkpoints/step=1000.ckpt"
 lr: 1e-4
 max_frames: 120
 debug: False

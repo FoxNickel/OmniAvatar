@@ -12,6 +12,7 @@ import imageio
 from PIL import Image
 import soundfile as sf
 import cv2
+import time
 
 # 调用这个dataset之前，要先调用数据集下面的那个generate_metadata的脚本，生成metadata.csv
 class WanVideoDataset(torch.utils.data.Dataset):
@@ -51,8 +52,19 @@ class WanVideoDataset(torch.utils.data.Dataset):
             audio_path = data["audio_path"]
             
             # 处理视频
-            reader = imageio.get_reader(video_path, 'ffmpeg')
-            meta = reader.get_meta_data()
+            for attempt in range(1, 4):
+                try:
+                    log(f"[WanVideoDataset __getitem__ info] -> try {attempt}/3 get_meta_data video_path={video_path}")
+                    reader = imageio.get_reader(video_path, "ffmpeg")
+                    meta = reader.get_meta_data()
+                    break
+                except Exception as err:
+                    force_log(f"[WanVideoDataset __getitem__ warning] -> attempt {attempt}/3 load meta failed {video_path}: {err}")
+                    time.sleep(0.2)
+                    reader = None
+            if reader is None or meta is None:
+                raise RuntimeError(f"get_meta_data failed after 3 attempts for {video_path}")
+            
             origin_video_fps = meta['fps']
             total_dur = meta['duration']
             origin_video_len = origin_video_fps * total_dur
