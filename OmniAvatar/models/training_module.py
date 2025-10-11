@@ -1,4 +1,7 @@
+import math
 import os
+import librosa
+import numpy as np
 import torch
 import time
 import pytorch_lightning as pl
@@ -12,6 +15,8 @@ from OmniAvatar.utils.log import log, force_log
 import torch.distributed as dist
 from OmniAvatar.utils.io_utils import save_video_as_grid_and_mp4
 import torch.optim as optim
+from PIL import Image
+from transformers import Wav2Vec2FeatureExtractor
 
 
 class OmniTrainingModule(pl.LightningModule):
@@ -26,6 +31,9 @@ class OmniTrainingModule(pl.LightningModule):
 
         # 加载音频模型Wav2Vec
         from OmniAvatar.models.wav2vec import Wav2VecModel
+        self.wav_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
+            args.wav2vec_path
+        )
         self.audio_encoder = Wav2VecModel.from_pretrained(
             args.wav2vec_path, local_files_only=True
         ).to(device=self.device)
@@ -167,28 +175,90 @@ class OmniTrainingModule(pl.LightningModule):
             force_log(f"[OmniTrainingModule] validation_step -> sample video_path={video_path}, current_epoch={self.current_epoch}")
             # 只在主进程做
             if dist.get_rank() == 0:
-                self.sample_video(inputs, video_path=video_path)
+                sample_data = {
+                    "prompt": batch["prompt"][0],
+                    "image_path": batch["first_frame_path"][0],
+                    "audio_path": batch["audio_path"][0],
+                    "output_dir": f"{self.args.output_path}/samples/epoch_{self.current_epoch:03d}_{os.path.basename(video_path[0])}",
+                }
+                sample_inputs = self.sample_preprocess(sample_data)
+                self.sample_video(sample_inputs)
 
         return val_loss
+
+    def sample_preprocess(self, data):
+        prompt = data["prompt"]
+        image_path = data["image_path"] # first_frame + ref image
+        audio_path = data["audio_path"]
+        output_dir = data["output_dir"]
+        target_fps = self.args.fps
+        target_dtype = next(self.pipe.vae.parameters()).dtype
+        print(f"[OmniTrainingModule] sample_preprocess -> target_dtype: {target_dtype}, device: {self.device}, prompt: {prompt}, image_path: {image_path}, audio_path: {audio_path}, output_dir: {output_dir}")
+        
+        # 组装输入音频
+        audio, sr = librosa.load(audio_path, sr=self.args.sample_rate)
+        input_values = np.squeeze(self.wav_feature_extractor(audio, sampling_rate=16000).input_values)
+        input_values = torch.from_numpy(input_values).float().to(device=self.device)
+        audio_len = math.ceil(len(input_values) / self.args.sample_rate * target_fps)
+        input_values = input_values.unsqueeze(0) # 这里又扩展出来batch维度了
+        with torch.no_grad():
+            hidden_states = self.audio_encoder(input_values, seq_len=audio_len, output_hidden_states=True)
+            audio_embeddings = hidden_states.last_hidden_state
+            for mid_hidden_states in hidden_states.hidden_states:
+                audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
+        audio_embeddings = audio_embeddings.to(dtype=target_dtype)
+        audio_emb = {"audio_emb": audio_embeddings}
+        
+        # 组装输入图像
+        target_w, target_h = 640, 400
+        image = Image.open(image_path).convert("RGB")
+        image = image.resize((target_w, target_h), Image.BILINEAR)
+        image = torch.from_numpy(np.array(image)).permute(2, 0, 1).float().div_(255.0) # [C, H, W] [3, H, W], [0, 1]
+        image = image.unsqueeze(0).to(self.device) # [B, C, H, W]
+        image = image * 2.0 - 1.0 # [B, C, H, W] [1, 3, H, W], [-1, 1]
+        image = image[:, :, None] # [B, C, T, H, W] [1, 3, 1, H, W]
+        image = image.to(dtype=target_dtype)
+        
+        L = audio_len
+        T = (L + 3) // 4
+        
+        # 组装img_lat和image_emb
+        image_emb = {}
+        img_lat = self.pipe.encode_video(image).to(self.device) # [B, C, 1, H', W']
+        msk = torch.zeros_like(img_lat.repeat(1, 1, T, 1, 1)[:,:1])
+        image_cat = img_lat.repeat(1, 1, T, 1, 1)
+        msk[:, :, 1:] = 1
+        image_emb["y"] = torch.cat([image_cat, msk], dim=1)
+        image_emb["y"] = image_emb["y"].to(dtype=target_dtype)
+        img_lat = torch.cat([img_lat, torch.zeros_like(img_lat[:, :, :1].repeat(1, 1, T - 1, 1, 1))], dim=2) # 将img_lat从1帧扩展到需要生成的段落长度，首帧是真实的，后续帧是0占位
+        img_lat = img_lat.to(dtype=target_dtype)
+        
+        return {
+            "input_latents": img_lat, # [B, C, T, H', W']
+            "image_emb": image_emb,   # {y: [B, C+1, T, H', W']}
+            "prompt": [prompt],       # list of str
+            "audio_emb": audio_emb["audio_emb"], # [B, L, D]?
+            "output_dir": output_dir,
+            "audio_path": audio_path,
+        }
     
-    def sample_video(self, inputs, video_path=None):
+    @torch.no_grad()
+    def sample_video(self, inputs):
         args = self.args
-        img_lat = inputs["input_latents"][0:1]
+        img_lat = inputs["input_latents"]
         prompt = inputs["prompt"][0]
-        image_emb = {k: v[0:1] for k, v in inputs["image_emb"].items()}
-        audio_emb = {"audio_emb": inputs["audio_emb"][0:1]}
+        image_emb = inputs["image_emb"]
+        audio_emb = {"audio_emb": inputs["audio_emb"]}
+        output_dir = inputs["output_dir"]
+        audio_path = inputs["audio_path"]
         inf_steps = 25
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        output_dir = f"{self.args.savedir}/samples_{video_path[0].split('/')[-2]}_{timestamp}"
-        log(f"[OmniTrainingModule] sample_video -> output_dir: {output_dir}, video_path: {video_path[0]}, prompt: {prompt}, latents shape: {img_lat.shape}, image_emb shape: {image_emb['y'].shape}, audio_emb shape: {audio_emb['audio_emb'].shape}")
         frames, _ = self.pipe.log_video(img_lat, prompt, 
                                            image_emb=image_emb, 
                                            audio_emb=audio_emb,
                                            num_inference_steps=inf_steps)
-        log(f"[OmniTrainingModule] sample_video -> frames.shape={frames.shape}")
         if frames.dim() == 4:
             frames = frames.unsqueeze(0)  # [1, T, C, H, W]
-        save_video_as_grid_and_mp4(frames, output_dir, args.fps)
+        save_video_as_grid_and_mp4(frames, output_dir, args.fps, audio_path=audio_path)
         
     
     def training_step(self, batch, batch_idx):
@@ -282,6 +352,7 @@ class OmniTrainingModule(pl.LightningModule):
         B, C, T, H, W = video_latents.shape
         prefix_lat_frame = 1
         image_cat = video_latents[:, :, :prefix_lat_frame]  # [B, C, prefix_lat_frame, H, W]
+        # TODO 这里好像漏了image = image * 2.0 - 1.0归一化到[-1, 1]？？？
         image_cat = image_cat.repeat(1, 1, T, 1, 1)    # [B, C, T, H, W]
         msk = torch.ones(B, 1, T, H, W, device=video_latents.device, dtype=video_latents.dtype)
         msk[:, :, :prefix_lat_frame] = 0

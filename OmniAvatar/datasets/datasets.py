@@ -50,6 +50,7 @@ class WanVideoDataset(torch.utils.data.Dataset):
             
             video_path = data["video_path"]
             audio_path = data["audio_path"]
+            first_frame_path = data["first_frame_path"]
             
             # 处理视频
             for attempt in range(1, 4):
@@ -135,6 +136,7 @@ class WanVideoDataset(torch.utils.data.Dataset):
             data['audio'] = audio_latent
             data['L'] = L
             data['T'] = T
+            data['first_frame_path'] = first_frame_path
             
             log(f"[Dataset][rank={rank}] __getitem__ EXIT data_id={data_id}, video_path={data['video_path']}, data[video].shape={data['video'].shape}, data[audio].shape={data['audio'].shape}")
             return data

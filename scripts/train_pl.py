@@ -47,6 +47,7 @@ def main():
         verbose=True,
         every_n_train_steps=500, # 保存ckpt的频率，every_n_train_steps*accumulate_grad_batches个step保存一次
         save_on_train_epoch_end=True,
+        # save_weights_only=True, # 只保存模型权重，不保存优化器等信息
     )
 
     # TODO load_full_weights的含义，以及怎么改False。省显存

@@ -366,7 +366,7 @@ class WanInferencePipeline(nn.Module):
                 self.pipe.load_models_to_device(['vae'])
                 img_lat = self.pipe.encode_video(image.to(dtype=self.dtype)).to(self.device)
                 assert img_lat.shape[2] == prefix_overlap
-            img_lat = torch.cat([img_lat, torch.zeros_like(img_lat[:, :, :1].repeat(1, 1, T - prefix_overlap, 1, 1))], dim=2) # 训练的时候不需要
+            img_lat = torch.cat([img_lat, torch.zeros_like(img_lat[:, :, :1].repeat(1, 1, T - prefix_overlap, 1, 1))], dim=2) # 训练的时候不需要，将img_lat从1帧扩展到需要生成的段落长度，首帧是真实的，后续帧是0占位
             # 调用log_video，去噪生成视频，img_lat：起始帧的 latent 表示，
             # image_emb：条件输入 embedding，有mask信息。
             # audio_emb：音频条件输入 embedding，这里的audio_emb是还没有经过AudioPack的，AudioPack是在WanModel的init里面做的，
