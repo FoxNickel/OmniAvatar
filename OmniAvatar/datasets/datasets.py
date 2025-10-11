@@ -20,7 +20,7 @@ class WanVideoDataset(torch.utils.data.Dataset):
         self.args = args
         self.validation = validation
         dataset_base_path = args.dataset_base_path
-        metadata_path = os.path.join(dataset_base_path, "metadata.csv") if not args.debug else "/home/huanglingyu/data/vgg/OmniAvatar/configs/demo.csv"
+        metadata_path = os.path.join(dataset_base_path, "metadata_10086.csv") if not args.debug else "/home/huanglingyu/data/vgg/OmniAvatar/configs/demo.csv"
         self.wav_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
             args.wav2vec_path
         )
