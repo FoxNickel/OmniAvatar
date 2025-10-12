@@ -127,6 +127,11 @@ class WanVideoDataset(torch.utils.data.Dataset):
                 audio_clip = np.pad(audio_clip, (0, target_audio_len - audio_clip.shape[0]))
             else:
                 audio_clip = audio_clip[:target_audio_len]
+            
+            # 这里保存主要是为了在validation阶段，最后sample视频的时候，把裁切过后的音频和生成的视频合成一个视频
+            if self.validation:
+                tmp_audio_path = audio_path.replace(".wav", f"_crop.wav").replace(".mp3", f"_crop.wav")
+                sf.write(tmp_audio_path, audio_clip, sr)
 
             # 音频特征提取
             audio_latent = np.squeeze(self.wav_feature_extractor(audio_clip, sampling_rate=args.sample_rate).input_values)
