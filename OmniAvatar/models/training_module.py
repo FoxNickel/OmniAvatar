@@ -256,9 +256,12 @@ class OmniTrainingModule(pl.LightningModule):
         input_values = np.squeeze(self.wav_feature_extractor(audio, sampling_rate=16000).input_values)
         input_values = torch.from_numpy(input_values).float().to(device=self.device)
         audio_len = math.ceil(len(input_values) / self.args.sample_rate * target_fps)
+        L = audio_len
+        L = L // 4 * 4 + 1 if L % 4 != 0 else L - 3 # 先这么调整，确保L满足4的倍数加1，方便后续UNet的下采样。但是音频长度会有1-3帧的误差
+        T = (L + 3) // 4
         input_values = input_values.unsqueeze(0) # 这里又扩展出来batch维度了
         with torch.no_grad():
-            hidden_states = self.audio_encoder(input_values, seq_len=audio_len, output_hidden_states=True)
+            hidden_states = self.audio_encoder(input_values, seq_len=L, output_hidden_states=True)
             audio_embeddings = hidden_states.last_hidden_state
             for mid_hidden_states in hidden_states.hidden_states:
                 audio_embeddings = torch.cat((audio_embeddings, mid_hidden_states), -1)
@@ -274,9 +277,6 @@ class OmniTrainingModule(pl.LightningModule):
         image = image * 2.0 - 1.0 # [B, C, H, W] [1, 3, H, W], [-1, 1]
         image = image[:, :, None] # [B, C, T, H, W] [1, 3, 1, H, W]
         image = image.to(dtype=target_dtype)
-        
-        L = audio_len
-        T = (L + 3) // 4
         
         # 组装img_lat和image_emb
         image_emb = {}
@@ -307,7 +307,7 @@ class OmniTrainingModule(pl.LightningModule):
         audio_emb = {"audio_emb": inputs["audio_emb"]}
         output_dir = inputs["output_dir"]
         audio_path = inputs["audio_path"]
-        inf_steps = 25
+        inf_steps = args.num_steps
         frames, _ = self.pipe.log_video(img_lat, prompt, 
                                            image_emb=image_emb, 
                                            audio_emb=audio_emb,
