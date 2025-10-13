@@ -12,6 +12,9 @@ num_persistent_param_in_dit:  # You can set `num_persistent_param_in_dit` to a s
 reload_cfg: True
 sp_size: 1
 
+# 推理参数
+num_steps: 50
+
 # 训练参数
 seed: 42
 dataset_base_path: /mnt/hdd2/huanglingyu/vgg/datasets/Koala-36M-v1

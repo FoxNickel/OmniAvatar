@@ -55,7 +55,7 @@ def main():
     module.pipe.load_models_to_device(["vae", "dit"])
     module.eval()
 
-    ckpt = "/home/huanglingyu/data/vgg/OmniAvatar/outputs/train_1.3B/checkpoints/step=3000.ckpt/merged_model/pytorch_model.bin"
+    ckpt = args.infer_ckpt_path
     state = torch.load(ckpt)  # 如果是 {"module": ...} 取里面那层
     if "state_dict" in state:
         state = state["state_dict"]
