@@ -28,7 +28,7 @@ nodes: 1
 devices: 4
 num_train_epochs: 1
 mode: train
-checkpoint_path: "/home/huanglingyu/data/vgg/OmniAvatar/outputs/train_1.3B/checkpoints/step=3000.ckpt"
+checkpoint_path: "/home/huanglingyu/data/vgg/OmniAvatar/outputs/train_1.3B/checkpoints/step=7000.ckpt"
 lr: 1e-4
 max_frames: 120
 debug: False
