@@ -25,10 +25,10 @@ sample_rate: 16000
 batch_size: 1 # 最高可以开6, 8会OOM, 7不知道行不行
 # nodes代表分布式训练的节点数，devices代表每个节点上的GPU数量
 nodes: 1
-devices: 8
+devices: 4
 num_train_epochs: 1
 mode: train
-checkpoint_path: ""
+checkpoint_path: "/mnt/hdd4/huanglingyu/vgg/OmniAvatar/outputs/train_1.3B/checkpoints/step=11000.ckpt"
 lr: 1e-4
 max_frames: 120
 debug: False

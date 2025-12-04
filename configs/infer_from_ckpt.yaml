@@ -15,7 +15,7 @@ sp_size: 1
 # 推理参数
 input_file: "examples/red_hat_2.txt"
 num_steps: 25
-infer_ckpt_path: "/mnt/hdd4/huanglingyu/vgg/OmniAvatar/outputs/train_1.3B/checkpoints/step=5000.ckpt/merged/pytorch_model.bin"
+infer_ckpt_path: "/mnt/hdd4/huanglingyu/vgg/OmniAvatar/outputs/train_1.3B/checkpoints/step=53000.ckpt/merged_model/pytorch_model.bin"
 
 # 训练参数
 seed: 42

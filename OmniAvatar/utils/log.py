@@ -1,7 +1,6 @@
 import os
 import sys
 import datetime
-import torch.distributed as dist
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from OmniAvatar.utils.args_config import parse_args
@@ -17,8 +16,6 @@ def log(str):
         print(str)
 
 def force_log(str):
-    if dist.get_rank() != 0:
-        return
     with open(log_filename, "a") as f:
         f.write(str + "\n")
     print(str)
